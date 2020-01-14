@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>LinkyLink</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css">
+
+	<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+	<script src="https://unpkg.com/bootstrap-material-design@4.1.1/dist/js/bootstrap-material-design.js"></script>
+
+	<script type="text/javascript">
+		result = {
+			ADCO:     {value:"341964285263", unit:"",    default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			OPTARIF:  {value:"HC..",         unit:"",    default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			ISOUSC:   {value:30,             unit:"A",   default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			HCHC:     {value:539670,         unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			HCHP:     {value:547415,         unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			EJPHN:    {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			EJPHPM:   {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			BBRHCJB:  {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			BBRHPJB:  {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			BBRHCJW:  {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			BBRHPJW:  {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			BBRHCJR:  {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			BBRHPJR:  {value:0,              unit:"Wh",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			PEJP:     {value:547415,         unit:"min", default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			PTEC:     {value:"HP..",         unit:"",    default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			DEMAIN:   {value:"",             unit:"",    default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			IINST:    {value:1,              unit:"A",   default:"Non transmit", disp1pMode: true,  disp3pMode: false },
+			IINST1:   {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			IINST2:   {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			IINST3:   {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			ADPS:     {value:0,              unit:"A",   default:"Non transmit", disp1pMode: true,  disp3pMode: false },
+			ADIR1:    {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			ADIR2:    {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			ADIR3:    {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			IMAX:     {value:90,             unit:"A",   default:"Non transmit", disp1pMode: true,  disp3pMode: false },
+			IMAX1:    {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			IMAX2:    {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			IMAX3:    {value:0,              unit:"A",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			PMAX:     {value:0,              unit:"W",   default:"Non transmit", disp1pMode: false, disp3pMode: true  },
+			PAPP:     {value:179,            unit:"VA",  default:"Non transmit", disp1pMode: true,  disp3pMode: true  },
+			HHPHC:    {value:"",             unit:"",    default:"Non transmit", disp1pMode: true,  disp3pMode: true  }
+		}
+
+		config = {
+			module: {
+				wifi: {
+					ssid:"Samuel",
+					psk :"samysamy68!",
+					mode:"STA"
+				}
+			},
+			linky: {
+				is3pMode: false
+			}
+		}
+
+		function autoUnit(value) {
+			if(value["value"] == 0 || value["value"] == "") { return value["default"]}
+			if(typeof value["value"] == 'number' &&  ["Wh","A","W","VA"].includes(value["unit"]) ) {
+				if(value["value"] < 1000) {return value["value"]+" "+value["unit"]; }
+				if(value["value"] < 1000000) {return (value["value"]/1000)+" K"+value["unit"]; }
+				if(value["value"] < 1000000000) {return (value["value"]/1000000)+" M"+value["unit"]; }
+				if(value["value"] < 1000000000000) {return (value["value"]/1000000000)+" G"+value["unit"]; }
+			} else {
+				return value["value"]+" "+value["unit"];
+			}
+		}
+
+
+		function updateValues() {
+			for(var key in result) {
+				sel=document.querySelector(".LINKY_"+key)
+				if(sel) sel.innerHTML = autoUnit(result[key])
+
+			} 
+
+			setTimeout(updateValues,500);
+		}
+
+		function navigate(id) {
+			pages = ["page_index","page_advanced","page_config"]
+			document.getElementById(id).style.display = "block";
+			for (var i = pages.length - 1; i >= 0; i--) {
+				if(pages[i] != id) document.getElementById(pages[i]).style.display = "none";
+			}
+		}
+
+
+		function setup() {
+			updateValues()
+
+			tBody = document.getElementById("page_advanced_ids")
+			tBody.innerHTML = ""
+			for(var key in result) {
+				if(result[key]["disp3pMode"] == config["linky"]["is3pMode"] || result[key]["disp1pMode"] == !config["linky"]["is3pMode"]) {
+					tBody.innerHTML += "<tr><td>"+key+"</td> <td class=\"LINKY_\""+key+"\">"+autoUnit(result[key])+"</td></tr>"
+				}
+			}
+
+			document.getElementById("module_wifi_ssid").value = config["module"]["wifi"]["ssid"]
+			document.getElementById("module_wifi_psk").value = config["module"]["wifi"]["psk"]
+			document.getElementById("module_wifi_psk").value = config["module"]["wifi"]["psk"]
+			document.getElementById("module_wifi_mode").checked = config["module"]["wifi"]["psk"]["mode"] == "AP"
+		}
+
+	</script>
+	<style type="text/css">
+		th {
+			font-size: 1.4em !important;
+		}
+
+		td {
+			font-size: 1.1em !important;
+		}
+	</style>
+</head>
+<body onload="setup()">
+	<!-- Image and text -->
+	<nav class="navbar navbar-dark bg-dark">
+		<a class="navbar-brand" href="#" style="font-size: 1.8em;">
+			<img src="logo.svg" width="35%" height="35%" class="d-inline-block align-top" alt="">
+			LinkyLink
+		</a>
+
+		<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+
+		<div class="collapse navbar-collapse" id="navbarSupportedContent">
+			<ul class="navbar-nav mr-auto">
+
+				<li class="nav-item">
+					<a class="nav-link" onclick="navigate('page_index')" href="#">Home</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" onclick="navigate('page_advanced')" href="#">Affichage avancer</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" onclick="navigate('page_config')" href="#">Configuration</a>
+				</li>
+			</ul>
+		</div>
+	</nav>
+   
+
+	<div  class="container" style="padding-top: 2%;">
+		<div id="page_index">
+			<table class="table table-bordered ">
+				<thead class="thead-dark" >
+					<tr>
+						<th >Intituler</th>
+						<th >Valeur</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>Numero du compteur</td>
+						<td class="LINKY_ADCO">130 Wh</td>
+					</tr>
+					<tr>
+						<td>Consomation actuelle</td>
+						<td class="LINKY_PAPP">130 Wh</td>
+					</tr>
+					<tr>
+						<td>Consomation heures creuse</td>
+						<td class="LINKY_HCHC">539670 Wh</td>
+					</tr>
+					<tr>
+						<td>Consomation heures pleine</td>
+						<td class="LINKY_HCHP">547300 Wh</td>
+					</tr>
+
+				</tbody>
+			</table>
+		</div>
+		<div id="page_advanced" style="display: none;  height: 0px" >
+			<table class="table table-bordered ">
+				<thead class="thead-dark" >
+					<tr><th >Intituler</th><th >Valeur</th></tr>
+				</thead>
+				<tbody id="page_advanced_ids">
+
+				</tbody>
+			</table>
+		</div>
+		<div id="page_config" style="display: none; height: 0px" >
+			<table class="table table-bordered ">
+				<thead class="thead-dark" >
+					<tr> <th colspan="2">Adaptation au linky</th> </tr>
+				</thead>
+				<tbody>
+					<tr> <td>Compteur triphaser</td> <td><input type="checkbox" name="triphaser"></td> </tr>
+					<tr>
+						<td colspan="2"><input type="submit" name="" value="Valider"></td>
+					</tr>
+				</tbody>
+			</table>
+			<table class="table table-bordered ">
+				<thead class="thead-dark" >
+					<tr> <th colspan="2">Configuration du module</th> </tr>
+				</thead>
+				<tbody>
+					<tr> <td>SSID Wifi</td>     <td><input id="module_wifi_ssid" type="text"     name="triphaser" value=""></td> </tr>
+					<tr> <td>PSK Wifi</td>      <td><input id="module_wifi_psk"  type="password" name="triphaser" value=""></td> </tr>
+					<tr> <td>Access point?</td> <td><input id="module_wifi_mode" type="checkbox" name="ap"></td> </tr>
+					<tr>
+						<td colspan="2"><input type="submit" name="" value="Valider"></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+</body>
+</html>
