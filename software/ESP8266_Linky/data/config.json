@@ -1,0 +1,18 @@
+{
+	"program": {
+		"version":"1.0",
+		"serial":"DEV-1",
+		"author":"TurtleForGaming",
+		"credits":[]	
+	},
+	"module": {
+		"setup":false,
+		"wifi": {
+			"ssid":"Samuel",
+			"psk":"samysamy68"
+		}
+	},
+	"linky": {
+		"is3pmode": false,
+	}
+}
