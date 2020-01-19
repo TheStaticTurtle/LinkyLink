@@ -1,200 +1,127 @@
-#include <ESP8266WiFi.h>
-
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
-
-#include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
-
-//needed for library
+#include <ESP8266WiFi.h>
 #include <DNSServer.h>
-#include <ESP8266WebServer.h>
-
-
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+//#include <WiFiManager.h>    
 #include <ArduinoJson.h>
-
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
 #include <WiFiUdp.h>
 
 #include "linky.h"
 
+const char* MODULE_SERIAL_NUM   = "01-DEV";
+const char* MODULE_VERSION_SOFT = "V1.0";
+const char* MODULE_VERSION_HARD = "V0.0-DEV";
 
-/*
-struct Config {
-	bool need_to_setup;
-	char wifi_ssid[64];
-	char wifi_psk[64];
-};
+Linky mLinky(D8,D7);
+AsyncWebServer server(80);
 
 
-Config config;
+const size_t ApiJsonTemplate_capacity = 31*JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(31) + 2190;
+DynamicJsonDocument ApiJsonTemplate_doc(ApiJsonTemplate_capacity);
+bool ApiJsonTemplate_IsThisShitSetup = false;
 
-void loadConfiguration(Config &config) {
-	File configFile = SPIFFS.open("/config.json","r");
-
-	if (!configFile) {
-		Serial.println("Failed to open config file");
-		return;
-	}
+void handleAPI_Info(AsyncWebServerRequest *request) {
+	Serial.println("*WEB: Serving 200 for: /api/info");
+	Serial.flush();
+	AsyncResponseStream *response = request->beginResponseStream("application/json");
 	
-	StaticJsonDocument<512> jsonBuffer;
-	deserializeJson(jsonBuffer, configFile);
-	
-	JsonObject root = jsonBuffer.as<JsonObject>(); // get the root object
-	
-	config.need_to_setup = root["module"]["setup"] | true;
-	strlcpy(config.wifi_ssid,  root["module"]["wifi"]["ssid"] | "LinkyLink" ,  sizeof(config.wifi_ssid));
-	strlcpy(config.wifi_psk ,  root["module"]["wifi"]["psk"]  | "LinkySetup",  sizeof(config.wifi_psk ));
+	StaticJsonDocument<200> doc;
+	doc["serial_number"]    = MODULE_SERIAL_NUM;
+	doc["version_software"] = MODULE_VERSION_SOFT;
+	doc["version_hardware"] = MODULE_VERSION_HARD;
+	doc["uptime"]           = millis() / 1000;
 
-	configFile.close();
+	serializeJson(doc, *response);
+
+	request->send(response);
 }
 
-void saveConfiguration(const Config &config) {
-	SPIFFS.remove("config.json");
+void handleAPI_Linky(AsyncWebServerRequest *request) {
+	Serial.println("*WEB: Serving 200 for: /api/linky");
+	Serial.flush();
 
-	File file = SPIFFS.open("/config.json", "w");
-	if (!file) { Serial.println(F("Failed to create file")); return; }
+	if(ApiJsonTemplate_IsThisShitSetup == false) {
+		Serial.println("*WEB: Api tempalte not cached yet.");
+		if(!SPIFFS.begin()) { request->send(520, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_FS_MOUNT\"}")); return; }
+		if(!SPIFFS.exists("/api_template.json")) { request->send(520, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_EXIST\"}")); return; }
 
-	StaticJsonDocument<512> doc;
+		File file = SPIFFS.open("/api_template.json", "r");
+		if (!file) { request->send(503, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_READ\"}")); return;  }
 
-	doc["module"]["wifi"]["ssid"] = config.wifi_ssid;
-	doc["module"]["wifi"]["ssid"] = config.wifi_psk;
-	doc["module"]["setup"] = config.need_to_setup;
-
-	if (serializeJson(doc, file) == 0) {  Serial.println(F("Failed to write to file")); }
-
-	file.close();
-}
-
-void www_api_config_setup(AsyncWebServerRequest *request) {
-	if (request->hasParam("wifi_ssid", true)) {
-		String ssid = request->getParam("wifi_ssid", true)->value();
-		if(ssid.length() > 32 || ssid.length() < 1) {
-				request->send(418, "text/plain", "SSID de mauvaise taille");
-		} else {
-			if (request->hasParam("wifi_psk", true)) {
-				String psk = request->getParam("wifi_psk", true)->value();
-				if(psk.length() > 32 || psk.length() < 8) {
-						request->send(418, "text/plain", "Mot de passe de mauvaise taille");
-				} else {
-					config.need_to_setup = false;
-					ssid.toCharArray(config.wifi_ssid, 32);
-					ssid.toCharArray(config.wifi_psk , 32);
-					saveConfiguration(config);
-					request->send(200, "text/plain", "Ok LinkyLink va redemarer et essaye de se connecter au reseau wifi.");
-				}
-			} else {
-				request->send(418, "text/plain", "Mot de passe manquant");
-			}
-		}
+		deserializeJson(ApiJsonTemplate_doc, file);
+		ApiJsonTemplate_IsThisShitSetup = true;
+		file.close();
 	} else {
-		request->send(418, "text/plain", "SSID Manquant");
-	}
-}
-
-
-void www_api_linky(AsyncWebServerRequest *request) {
-	File file = SPIFFS.open("api_template.json","r");
-
-	StaticJsonDocument<8192> doc;
-	DeserializationError error = deserializeJson(doc, file);
-	if (error) {
-		Serial.println(F("Failed to read api template file"));
+		Serial.println("*WEB: Api template cached.");
 	}
 
 	LinkyData linkyData = mLinky.grab();
-	doc["ADCO"   ]["value"] = linkyData.ADCO;
-	doc["OPTARIF"]["value"] = linkyData.OPTARIF;
-	doc["ISOUSC" ]["value"] = linkyData.ISOUSC;
-	doc["HCHC"   ]["value"] = linkyData.HCHC;
-	doc["HCHP"   ]["value"] = linkyData.HCHP;
-	doc["EJPHN"  ]["value"] = linkyData.EJPHN;
-	doc["EJPHPM" ]["value"] = linkyData.EJPHPM;
-	doc["BBRHCJB"]["value"] = linkyData.BBRHCJB;
-	doc["BBRHPJB"]["value"] = linkyData.BBRHPJB;
-	doc["BBRHCJW"]["value"] = linkyData.BBRHCJW;
-	doc["BBRHPJW"]["value"] = linkyData.BBRHPJW;
-	doc["BBRHCJR"]["value"] = linkyData.BBRHCJR;
-	doc["BBRHPJR"]["value"] = linkyData.BBRHPJR;
-	doc["PEJP"   ]["value"] = linkyData.PEJP;
-	doc["PTEC"   ]["value"] = linkyData.PTEC;
-	doc["DEMAIN" ]["value"] = linkyData.DEMAIN;
-	doc["IINST"  ]["value"] = linkyData.IINST;
-	doc["IINST1" ]["value"] = linkyData.IINST1;
-	doc["IINST2" ]["value"] = linkyData.IINST2;
-	doc["IINST3" ]["value"] = linkyData.IINST3;
-	doc["ADPS"   ]["value"] = linkyData.ADPS;
-	doc["ADIR1"  ]["value"] = linkyData.ADIR1;
-	doc["ADIR2"  ]["value"] = linkyData.ADIR2;
-	doc["ADIR3"  ]["value"] = linkyData.ADIR3;
-	doc["IMAX"   ]["value"] = linkyData.IMAX;
-	doc["IMAX1"  ]["value"] = linkyData.IMAX1;
-	doc["IMAX2"  ]["value"] = linkyData.IMAX2;
-	doc["IMAX3"  ]["value"] = linkyData.IMAX3;
-	doc["PMAX"   ]["value"] = linkyData.PMAX;
-	doc["PAPP"   ]["value"] = linkyData.PAPP;
-	doc["HHPHC"  ]["value"] = linkyData.HHPHC;
+	ApiJsonTemplate_doc["ADCO"   ]["value"] = linkyData.ADCO;
+	ApiJsonTemplate_doc["OPTARIF"]["value"] = linkyData.OPTARIF;
+	ApiJsonTemplate_doc["ISOUSC" ]["value"] = linkyData.ISOUSC;
+	ApiJsonTemplate_doc["HCHC"   ]["value"] = linkyData.HCHC;
+	ApiJsonTemplate_doc["HCHP"   ]["value"] = linkyData.HCHP;
+	ApiJsonTemplate_doc["EJPHN"  ]["value"] = linkyData.EJPHN;
+	ApiJsonTemplate_doc["EJPHPM" ]["value"] = linkyData.EJPHPM;
+	ApiJsonTemplate_doc["BBRHCJB"]["value"] = linkyData.BBRHCJB;
+	ApiJsonTemplate_doc["BBRHPJB"]["value"] = linkyData.BBRHPJB;
+	ApiJsonTemplate_doc["BBRHCJW"]["value"] = linkyData.BBRHCJW;
+	ApiJsonTemplate_doc["BBRHPJW"]["value"] = linkyData.BBRHPJW;
+	ApiJsonTemplate_doc["BBRHCJR"]["value"] = linkyData.BBRHCJR;
+	ApiJsonTemplate_doc["BBRHPJR"]["value"] = linkyData.BBRHPJR;
+	ApiJsonTemplate_doc["PEJP"   ]["value"] = linkyData.PEJP;
+	ApiJsonTemplate_doc["PTEC"   ]["value"] = linkyData.PTEC;
+	ApiJsonTemplate_doc["DEMAIN" ]["value"] = linkyData.DEMAIN;
+	ApiJsonTemplate_doc["IINST"  ]["value"] = linkyData.IINST;
+	ApiJsonTemplate_doc["IINST1" ]["value"] = linkyData.IINST1;
+	ApiJsonTemplate_doc["IINST2" ]["value"] = linkyData.IINST2;
+	ApiJsonTemplate_doc["IINST3" ]["value"] = linkyData.IINST3;
+	ApiJsonTemplate_doc["ADPS"   ]["value"] = linkyData.ADPS;
+	ApiJsonTemplate_doc["ADIR1"  ]["value"] = linkyData.ADIR1;
+	ApiJsonTemplate_doc["ADIR2"  ]["value"] = linkyData.ADIR2;
+	ApiJsonTemplate_doc["ADIR3"  ]["value"] = linkyData.ADIR3;
+	ApiJsonTemplate_doc["IMAX"   ]["value"] = linkyData.IMAX;
+	ApiJsonTemplate_doc["IMAX1"  ]["value"] = linkyData.IMAX1;
+	ApiJsonTemplate_doc["IMAX2"  ]["value"] = linkyData.IMAX2;
+	ApiJsonTemplate_doc["IMAX3"  ]["value"] = linkyData.IMAX3;
+	ApiJsonTemplate_doc["PMAX"   ]["value"] = linkyData.PMAX;
+	ApiJsonTemplate_doc["PAPP"   ]["value"] = linkyData.PAPP;
+	ApiJsonTemplate_doc["HHPHC"  ]["value"] = linkyData.HHPHC;
 	
-	String test;
-	serializeJson(doc, test);
-	request->send(200, "application/json", test);
 
-	file.close();
+	AsyncResponseStream *response = request->beginResponseStream("application/json");
+
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+    response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Origin", "*");
+
+	serializeJson(ApiJsonTemplate_doc, *response);
+
+	request->send(response);
 }
 
-String www_processor(const String& var) {
-	return var;
-}
-*/
 
-Linky mLinky(D8,D7);
-//ESP8266WebServer server(80);
-//std::unique_ptr<ESP8266WebServer> server;
-ESP8266WebServer server(80);
-
-
-void handleRoot() {
-	if(!SPIFFS.begin()) {
-		server.send(200, "text/html", F("<h1>Il y'a eu une erreur lors du chargement de la page (Code d'erreur: SPIFFS_FAIL_FS_MOUNT </h1>"));
-		return;
-	}
-	Serial.println("*FS: Beginned");
+void sendFileToServer(char* filename, AsyncWebServerRequest *request) {
+	Serial.println("*WEB: Serving 200 for url: "+request->url());
 	Serial.flush();
 
-	if(!SPIFFS.exists("/www_index.html"))  {
-		server.send(200, "text/html", F("<h1>Il y'a eu une erreur lors du chargement de la page (Code d'erreur: SPIFFS_FAIL_EXIST_INDEX </h1>"));
-		return;
-	}
-	Serial.println("*FS: File exist");
-	Serial.flush();
-
-	File file = SPIFFS.open("/www_index.html", "r");
-	if (!file) {
-		server.send(200, "text/html", F("<h1>Il y'a eu une erreur lors du chargement de la page (Code d'erreur: SPIFFS_FAIL_READ_INDEX </h1>"));
-		return;
-	}
-	Serial.println("*FS: Reading ....");
-	Serial.flush();
-
-	server.setContentLength(file.size());
-    server.send ( 200, "text/html", "<!--init-->");
-
-	while (file.available()){
-        server.sendContent(file.readStringUntil('\n'));
-		yield();
-	}
-
-	/*if (server.streamFile(file, "text/html") != file.size()) {
-		Serial.println("*WEB: Sent less data than expected!");
-	}*/
+	AsyncWebServerResponse *response = request->beginResponse(SPIFFS, filename);
 	
-	server.send(200, "text/html", F("<h1>Il y'a eu une erreur lors du chargement de la page (Code d'erreur: SPIFFS_FAIL_READ_INDEX </h1>"));
-	
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+    response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Origin", "*");
+
+	request->send(response);
+
 }
 
-void handleNotFound() {
-	server.send(404, "text/plain", "File not found");
+void handleNotFound( AsyncWebServerRequest *request) {
+	Serial.println("*WEB: Serving 404 for url: "+request->url());
+	Serial.flush();
+    request->send(404, "text/plain", "File "+request->url()+" not found");
 }
 
 
@@ -210,18 +137,33 @@ void setup() {
 	while (dir.next()) { Serial.print(dir.fileName());  Serial.print(" / "); Serial.println(dir.fileSize()); }
 
 
-	WiFiManager wifiManager;
-	wifiManager.autoConnect("LinkyLink", "LinkySetup");
+	//WiFiManager wifiManager;
+	//wifiManager.autoConnect("LinkyLink", "LinkySetup");
+	WiFi.mode(WIFI_STA);
+    WiFi.begin("Host", "zdcrbhiy0389499447");
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+        Serial.printf("WiFi Failed!\n");
+        return;
+    }
 
-	if (MDNS.begin("linkylink")) {
-		Serial.println("MDNS responder started");
-	}
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
 
-	////server.reset(new ESP8266WebServer(WiFi.localIP(), 80));
 
-	server.on("/", handleRoot);
+
+	if (MDNS.begin("LinkyLink")) { Serial.println("MDNS responder started"); }
+
+	
+	server.on("/"                 , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/index.html"       ,request); });
+	server.on("/logo.svg"         , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/logo.svg"         ,request); });
+	server.on("/fa-solid-900.ttf" , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/fa-solid-900.ttf" ,request); });
+	server.on("/js.js"            , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/js.js"            ,request); });
+	server.on("/css.css"          , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/css.css"          ,request); });
+	server.on("/api/linky"        , HTTP_GET, handleAPI_Linky);
+	server.on("/api/info"         , HTTP_GET, handleAPI_Info);
 	server.onNotFound(handleNotFound);
 	server.begin();
+
 	Serial.println(F("*WEB: Begin ok"));
 
 	ArduinoOTA.setHostname("LinkyLink");
@@ -299,9 +241,8 @@ void dumpStruct(LinkyData linkyData) {
 //int a,b;
 void loop() {
 	//a = ESP.getFreeHeap();
-	server.handleClient();
 	ArduinoOTA.handle();
-	mLinky.update(1000);
+	//mLinky.update(1000);
 	//LinkyData data = mLinky.grab();
 	//dumpStruct(data);
 	//delay(10);
