@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>LinkyLink</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" type="text/css" href="css.css">
+	<script type="text/javascript" src="js.js"></script>
+	<script type="text/javascript">
+		config = {
+			linky: {
+				is3pMode: false
+			}
+		}
+
+		function autoUnit(value) {
+			if(value["value"] == 0 || value["value"] == "") { return value["default"]}
+			if(typeof value["value"] == 'number' &&  ["Wh","A","W","VA"].includes(value["unit"]) ) {
+				if(value["value"] < 1000) {return value["value"]+" "+value["unit"]; }
+				if(value["value"] < 1000000) {return (value["value"]/1000)+" K"+value["unit"]; }
+				if(value["value"] < 1000000000) {return (value["value"]/1000000)+" M"+value["unit"]; }
+				if(value["value"] < 1000000000000) {return (value["value"]/1000000000)+" G"+value["unit"]; }
+			} else {
+				return value["value"]+" "+value["unit"];
+			}
+		}
+
+
+		function update() {
+			$(".updateIcon").addClass("fa-spin");
+			$.getJSON( "/api/linky", function( data ) {
+				for(var key in data) {
+					sel=document.querySelector(".LINKY_"+key)
+					if(sel) sel.innerHTML = autoUnit(data[key])
+
+					tBody = document.getElementById("page_advanced_ids")
+					tBody.innerHTML = ""
+					for(var key in data) {
+						if(data[key]["disp3pMode"] == config["linky"]["is3pMode"] || data[key]["disp1pMode"] == !config["linky"]["is3pMode"]) {
+							tBody.innerHTML += "<tr><td>"+key+"</td> <td class=\"LINKY_\""+key+"\" colspan=\"2\">"+autoUnit(data[key])+"</td></tr>"
+						}
+					}
+
+				} 
+
+				$.getJSON( "/api/info", function( data ) {
+					document.getElementById("info_version_hardware").innerHTML = data["version_hardware"]
+					document.getElementById("info_version_software").innerHTML = data["version_software"]
+					document.getElementById("info_serial").innerHTML           = data["serial_number"]
+					document.getElementById("info_uptime").innerHTML           = data["uptime"] + "sec"
+
+					$(".updateIcon").removeClass("fa-spin");
+				});
+
+			});
+
+
+			// setTimeout(update,500); // Don't uncomment or it WILL burn everything (The module will crash due to low memory)
+		}
+
+		function navigate(id) {
+			pages = ["page_index","page_advanced","page_info"]
+			document.getElementById(id).style.display = "block";
+			for (var i = pages.length - 1; i >= 0; i--) {
+				if(pages[i] != id) document.getElementById(pages[i]).style.display = "none";
+			}
+		}
+
+
+		function setup() {
+			update();
+		}
+
+	</script>
+</head>
+<body onload="setup()" class="mdb-skin bg-skin-lp">
+	<nav class="navbar navbar-dark bg-dark">
+		<a class="navbar-brand" href="#" style="font-size: 1.8em;">
+			<img src="logo.svg" width="35%" height="35%" class="d-inline-block align-top" alt="">
+			LinkyLink
+		</a>
+
+		<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+
+		<div class="collapse navbar-collapse" id="navbarSupportedContent">
+			<ul class="navbar-nav mr-auto">
+				<li class="nav-item">
+					<a class="nav-link" data-toggle="collapse" data-target="#navbarSupportedContent" onclick="navigate('page_index')" href="#">Home</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" data-toggle="collapse" data-target="#navbarSupportedContent" onclick="navigate('page_advanced')" href="#">Affichage avancer</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link"data-toggle="collapse" data-target="#navbarSupportedContent" onclick="navigate('page_info')" href="#">Informations</a>
+				</li>
+			</ul>
+		</div>
+	</nav>
+   
+
+	<div  class="container" style="padding-top: 2%;">
+		<div id="page_index">
+			<table class="table table-bordered ">
+				<thead class="thead-dark" >
+					<tr>
+						<th style="vertical-align: middle;">Intituler</th>
+						<th style="vertical-align: middle; border-right: none;">Valeur</th>
+						<th class="col-1" style="border-left: none;">
+							<button type="button" onclick="update()" class="float-right m-0 p-2 btn btn-success">
+								<i class="updateIcon fas fa-sync-alt fa-2x"></i>
+							</button>
+						</th>
+
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>Numero du compteur</td>
+						<td class="LINKY_ADCO" colspan="2">Erreur javascript est obligatoire</td>
+					</tr>
+					<tr>
+						<td>Consomation actuelle</td>
+						<td class="LINKY_PAPP" colspan="2">Erreur javascript est obligatoire</td>
+					</tr>
+					<tr>
+						<td>Consomation heures creuse</td>
+						<td class="LINKY_HCHC" colspan="2">Erreur javascript est obligatoire</td>
+					</tr>
+					<tr>
+						<td>Consomation heures pleine</td>
+						<td class="LINKY_HCHP" colspan="2">Erreur javascript est obligatoire</td>
+					</tr>
+
+				</tbody>
+			</table>
+		</div>
+		<div id="page_advanced" style="display: none;  height: 0px" >
+			<table class="table table-bordered ">
+				<thead class="thead-dark" >
+					<tr>
+						<th style="vertical-align: middle;">Intituler</th>
+						<th style="vertical-align: middle; border-right: none;">Valeur</th>
+						<th class="col-1" style="border-left: none;">
+							<button type="button" onclick="update()" class="float-right m-0 p-2 btn btn-success">
+								<i class="updateIcon fas fa-sync-alt fa-2x"></i>
+							</button>
+						</th>
+					</tr>
+				</thead>
+				<tbody id="page_advanced_ids">
+
+				</tbody>
+			</table>
+		</div>
+		<div id="page_info" style="display: none;  height: 0px" >
+			<h3>Information sur le module LinkyLink:</h3>
+			<table>
+				<tr>
+					<td>Version du logiciel: </td>
+					<td id="info_version_software" >UNKNOWN</td>
+				</tr>
+				<tr>
+					<td>Version du module: </td>
+					<td id="info_version_hardware" >UNKNOWN</td>
+				</tr>
+				<tr>
+					<td>Uptime: </td>
+					<td id="info_uptime" >UNKNOWN</td>
+				</tr>
+				<tr>
+					<td>Serial number: </td>
+					<td id="info_serial" >UNKNOWN</td>
+				</tr>
+			</table>
+			<h3 style="margin-top: 20px;">Un probleme / contact:</h3>
+			Le github: <a href="https://github.com/TurtleForGaming/LinkyLink">https://github.com/TurtleForGaming/LinkyLink</a><br>
+			Envoyer un mail: <a href="mailto:samuel@turtleforgaming.fr">samuel@turtleforgaming.fr</a><br>
+		</div>
+
+
+	</div>
+
+</body>
+</html>
