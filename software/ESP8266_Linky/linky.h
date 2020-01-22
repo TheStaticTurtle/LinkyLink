@@ -58,17 +58,22 @@ class Linky
 	public:
 		Linky(int RXPin,int TXPin);
 		void begin();
+		void end();
 		bool isValidNumber(String str);
 		int getCommandValue_int(String CMD, int CMDlenght, int CMDResultLenght, String line, int lineLenght, int defaultIfError);
 		long getCommandValue_long(String CMD, int CMDlenght, int CMDResultLenght, String line, int lineLenght, long defaultIfError) ;
 		bool getCommandValue_str(String CMD, int CMDlenght, int CMDResultLenght, String line, int lineLenght, char* value);
-		void update(int timeout);
+		void updateAsync();
+		void updateAsync(int blinkPin, bool invert);
 		LinkyData grab();
 	private:
 		void updateStruct(int len) ;
+		void processRXChar(char c);
 		int 			_pin_RX;
 		int 			_pin_TX;
     	SoftwareSerial* _serport;
+    	bool			_serialEnabled = false;
+		int 			_bufferIterator;
     	char 			_buffer[LINKY_BUFFER_TELEINFO_SIZE];
     	LinkyData 		_data;
 };

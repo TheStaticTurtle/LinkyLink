@@ -6,11 +6,23 @@
 Linky::Linky(int RXPin, int TXPin) {
 	_pin_RX = RXPin;
 	_pin_TX = TXPin;
+	_serport = new SoftwareSerial(_pin_RX, _pin_TX); // RX, TX
 }
 
 void Linky::begin() {
-	_serport = new SoftwareSerial(_pin_RX, _pin_TX); // RX, TX
-	_serport->begin(LINKY_COM_RATE);
+	if(!_serialEnabled) {
+		_serialEnabled = true;
+		_serport->begin(LINKY_COM_RATE);
+		//_serport->setRxIntMsk(true);
+	}
+}
+void Linky::end() {
+	if(_serialEnabled) {
+		_serport->stopListening();
+		//_serport->setRxIntMsk(false);
+		_serport->end();
+		_serialEnabled = false;
+	}
 }
 
 bool Linky::isValidNumber(String str){
@@ -83,6 +95,59 @@ void Linky::updateStruct(int len) {
 						getCommandValue_str ("PPOT"    , 4, 2,_buffer,len+1, _data.PPOT);
 }
 
+void Linky::processRXChar(char currentChar) {
+	if(currentChar == LINKY_START_FRAME) {
+		memset(_buffer, 0, LINKY_BUFFER_TELEINFO_SIZE);
+		_bufferIterator = 0;
+
+	} else if(currentChar == LINKY_START_LINE) {
+		memset(_buffer, 0, LINKY_BUFFER_TELEINFO_SIZE);
+		_bufferIterator = 0;
+
+	} else if(currentChar == LINKY_END_FRAME) {
+		memset(_buffer, 0, LINKY_BUFFER_TELEINFO_SIZE);
+		_bufferIterator = 0;
+
+	} else if(currentChar == LINKY_END_LINE) {
+		updateStruct(_bufferIterator);
+		memset(_buffer, 0, LINKY_BUFFER_TELEINFO_SIZE);
+		_bufferIterator = 0;
+
+	} else if(currentChar == LINKY_END_DATA) {
+		memset(_buffer, 0, LINKY_BUFFER_TELEINFO_SIZE);
+		_bufferIterator = 0;
+
+	} else {
+		_buffer[_bufferIterator] = currentChar;
+		_bufferIterator++;
+
+	}
+}
+void Linky::updateAsync() {
+	if(_serport->available()) {
+		char currentChar;
+
+		currentChar = _serport->read() & 0x7F;
+		processRXChar(currentChar);
+	}
+}
+
+void Linky::updateAsync(int blinkPin, bool invert) {
+	if(_serport->available()) {
+		char currentChar;
+
+		currentChar = _serport->read() & 0x7F;
+		processRXChar(currentChar);
+
+		if(currentChar == LINKY_START_FRAME) {
+			digitalWrite(blinkPin,!invert);
+		} else if(currentChar == LINKY_END_FRAME || currentChar == LINKY_END_DATA) {
+			digitalWrite(blinkPin,invert);
+		}
+	}
+}
+
+/*
 void Linky::update(int timeout) {
 	char currentChar;
 	bool readingLine = false;
@@ -123,7 +188,7 @@ void Linky::update(int timeout) {
 		}
 	}
 }
-
+*/
 LinkyData Linky::grab() {
 	return _data;
 }
