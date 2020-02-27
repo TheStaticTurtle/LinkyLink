@@ -4,8 +4,22 @@
 	<title>LinkyLink</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" type="text/css" href="css.css">
+	<link rel="icon" type="image/png" href="favicon.png">
 	<script type="text/javascript" src="js.js"></script>
 	<script type="text/javascript">
+		jQuery.expr[':'].regex = function(elem, index, match) {
+		    var matchParams = match[3].split(','),
+		        validLabels = /^(data|css):/,
+		        attr = {
+		            method: matchParams[0].match(validLabels) ? 
+		                        matchParams[0].split(':')[0] : 'attr',
+		            property: matchParams.shift().replace(validLabels,'')
+		        },
+		        regexFlags = 'ig',
+		        regex = new RegExp(matchParams.join('').replace(/^\s+|\s+$/g,''), regexFlags);
+		    return regex.test(jQuery(elem)[attr.method](attr.property));
+		}
+
 		config = {
 			linky: {
 				is3pMode: false
@@ -13,7 +27,7 @@
 		}
 
 		function autoUnit(value) {
-			if(value["value"] == 0 || value["value"] == "") { return value["default"]}
+			if(value["value"] == 0 || value["value"] == "" || value["value"] == null) { return value["default"]}
 			if(typeof value["value"] == 'number' &&  ["Wh","A","W","VA"].includes(value["unit"]) ) {
 				if(value["value"] < 1000) {return value["value"]+" "+value["unit"]; }
 				if(value["value"] < 1000000) {return (value["value"]/1000)+" K"+value["unit"]; }
@@ -24,9 +38,113 @@
 			}
 		}
 
+		function smooth(arr, windowSize, getter = (value) => value, setter) {
+			const get = getter
+			const result = []
 
-		function update() {
-			$(".updateIcon").addClass("fa-spin");
+			for (let i = 0; i < arr.length; i += 1) {
+				const leftOffeset = i - windowSize
+				const from = leftOffeset >= 0 ? leftOffeset : 0
+				const to = i + windowSize + 1
+
+				let count = 0
+				let sum = 0
+				for (let j = from; j < to && j < arr.length; j += 1) {
+					sum += get(arr[j])
+					count += 1
+				}
+
+				var k = setter ? setter(arr[i], sum / count) : sum / count
+				result[i] = Math.round(k*100) / 100.0
+			}
+
+			return result
+		}
+
+		function linspace(startValue, stopValue, valueCount) {
+			var arr = [];
+			var step = (stopValue - startValue) / (valueCount - 1);
+			for (var i = 0; i < valueCount; i++) {
+				arr.push(startValue + (step * i));
+			}
+			return arr;
+		}
+
+		var myChart;
+		function createGraph() {
+
+			$.get( "/api/history", function( Jraw ) {
+				try {
+					J = JSON.parse( Jraw.replace(",],","],") )
+				}
+				catch(err) {
+					console.log(Jraw);
+					return;
+				}
+				labels = []
+				data = []
+
+				rawTimestamp = linspace(J["begin_time"], J["end_time"], J["data"].length)
+
+				for (var i = 0; i < rawTimestamp.length; i++) {
+					var date = new Date(rawTimestamp[i] * 1000 );
+
+					d  = ( date.getMonth() > 9 ? date.getMonth() : "0"+date.getMonth() ) + "/"
+					d += ( date.getDate() > 9 ? date.getDate() : "0"+date.getDate() ) +" "
+					d += ( date.getHours() > 9 ? date.getHours() : "0"+date.getHours() ) + ":"
+					d += ( date.getMinutes() > 9 ? date.getMinutes() : "0"+date.getMinutes() )
+
+					labels.push( d )
+				}
+				for (var i = 0; i < J["data"].length; i++) {
+					data.push( J["data"][i] )
+				}
+
+				dataSmoothed = smooth(data,2)
+
+				if(myChart == null) {
+					var ctx = $('#PAPPChart');
+					myChart = new Chart(ctx, {
+						type: 'line',
+						data: {
+						labels: labels,
+						datasets: [{
+								label: 'Consomation',
+								data: dataSmoothed,
+								backgroundColor: 'rgba(252, 115, 3, 0.2)',
+								borderColor: 'rgba(252, 115, 3, 1)',
+								borderWidth: 1,
+								cubicInterpolationMode: 'monotone'
+							}]
+						},
+						options: {
+							scales: {
+								yAxes: [{
+									ticks: { beginAtZero: true }
+								}]
+							},
+							elements: {
+								point:{ radius: 0 }
+							},
+							tooltips: {
+								callbacks: {
+									label: (item) => `${item.yLabel} VA`,
+								},
+	            				mode: 'index',
+	            				intersect: false
+							}
+						}
+					});
+				} else {
+					myChart.data.datasets[0].data = dataSmoothed
+					myChart.data.labels = labels
+					myChart.update();
+				}
+
+			});
+		}
+
+		function updateLinky() {
 			$.getJSON( "/api/linky", function( data ) {
 				for(var key in data) {
 					sel=document.querySelector(".LINKY_"+key)
@@ -36,27 +154,46 @@
 					tBody.innerHTML = ""
 					for(var key in data) {
 						if(data[key]["disp3pMode"] == config["linky"]["is3pMode"] || data[key]["disp1pMode"] == !config["linky"]["is3pMode"]) {
-							tBody.innerHTML += "<tr><td>"+key+"</td> <td class=\"LINKY_\""+key+"\" colspan=\"2\">"+autoUnit(data[key])+"</td></tr>"
+							tBody.innerHTML += "<tr><td>"+key+"</td> <td class=\"LINKY_"+key+"\">"+autoUnit(data[key])+"</td></tr>"
 						}
 					}
 
 				} 
-
-				$.getJSON( "/api/info", function( data ) {
-					document.getElementById("info_version_hardware").innerHTML = data["version_hardware"]
-					document.getElementById("info_version_software").innerHTML = data["version_software"]
-					document.getElementById("info_serial").innerHTML           = data["serial_number"]
-					document.getElementById("info_uptime").innerHTML           = data["uptime"] + "sec"
-
-					$(".updateIcon").removeClass("fa-spin");
-				});
-
 			});
 
-
-			// setTimeout(update,500); // Don't uncomment or it WILL burn everything (The module will crash due to low memory)
 		}
 
+		function updateInfo() {
+			$.getJSON( "/api/info", function( data ) {
+				document.getElementById("info_version_hardware").innerHTML = data["version_hardware"]
+				document.getElementById("info_version_software").innerHTML = data["version_software"]
+				document.getElementById("info_serial").innerHTML           = data["serial_number"]
+				document.getElementById("info_uptime").innerHTML           = data["uptime"] + "sec"
+				document.getElementById("info_lastUpdate").innerHTML       = data["lastUpdate"] + "sec"
+				updateFinished()
+			});
+		}
+
+		function reboot() {
+			$(".updateIcon").addClass("fa-spin");
+			// $('#alertreboot').show();
+			$.get( "/api/reboot", function( data ) {});
+			setTimeout(update, 5000);
+		}
+
+		function debug() {
+			$.getJSON( "/api/debug", function( data ) {
+				for(var key in data) {
+					tBody = document.getElementById("table_debug")
+					tBody.innerHTML = ""
+					for(var key in data) {
+						tBody.innerHTML += "<tr><td>"+key+"</td> <td>"+data[key]+"</td></tr>"
+					}
+				} 
+				$('#debugModal').modal('show');
+			});
+			
+		}
 		function navigate(id) {
 			pages = ["page_index","page_advanced","page_info"]
 			document.getElementById(id).style.display = "block";
@@ -65,23 +202,43 @@
 			}
 		}
 
+		function update() {
+			$(".updateIcon").addClass("fa-spin");
+			updateLinky();
+			updateInfo();
+			createGraph();
+			//setTimeout(update,30000); // Don't uncomment or it WILL burn everything (The module will crash due to low memory) If you want to do it use a minimum of 31sec
+		}
+		function updateFinished() {
+			$(".updateIcon").removeClass("fa-spin");
+		}
 
 		function setup() {
-			update();
+			$("td:regex(class, .*LINKY.*)").each(function() {
+				$(this)[0].innerHTML = "Chargement en cour."
+			});
+			update()
 		}
 
 	</script>
 </head>
 <body onload="setup()" class="mdb-skin bg-skin-lp">
+
 	<nav class="navbar navbar-dark bg-dark">
 		<a class="navbar-brand" href="/" style="font-size: 1.8em;">
-			<img src="logo.svg" width="35%" height="35%" class="d-inline-block align-top" alt="">
+			<img src="logo.svg" width="45" height="45"  class="d-inline-block align-top" alt="">
 			LinkyLink
 		</a>
 
-		<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-			<span class="navbar-toggler-icon"></span>
-		</button>
+
+		<div>
+			<button style="margin-right: 10px" type="button" onclick="update()" class="btn btn-success">
+				<i class="updateIcon fas fa-sync-alt fa-2x"></i>
+			</button>
+			<button class="btn btn-outline-secondary" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+				<span style="font-size: 1.425em" class="navbar-toggler-icon"></span>
+			</button>
+		</div>
 
 		<div class="collapse navbar-collapse" id="navbarSupportedContent">
 			<ul class="navbar-nav mr-auto">
@@ -98,42 +255,70 @@
 		</div>
 	</nav>
    
+	<div class="modal fade" id="debugModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+		<div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h3 class="modal-title" id="exampleModalLongTitle">Debug information</h3>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+						<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+				<div class="modal-body">
+					<table class="table table-sm table-hover table-bordered">
+						<thead class=" thead-dark">
+							<tr>
+								<th>Key</th>
+								<th>Value</th>
+							</tr>
+						</thead>
+						<tbody id="table_debug">
+							<tr>
+								<td>Key</td>
+								<td>Value</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-success"  data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
 
 	<div  class="container" style="padding-top: 2%;">
-		<div id="page_index">
+		<div id="page_index" width="100%">
 			<table class="table table-bordered ">
 				<thead class="thead-dark" >
 					<tr>
 						<th style="vertical-align: middle;">Intituler</th>
-						<th style="vertical-align: middle; border-right: none;">Valeur</th>
-						<th class="col-1" style="border-left: none;">
-							<button type="button" onclick="update()" class="float-right m-0 p-2 btn btn-success">
-								<i class="updateIcon fas fa-sync-alt fa-2x"></i>
-							</button>
+						<th style="vertical-align: middle; border-right: none;">
+							Valeur
 						</th>
-
 					</tr>
 				</thead>
 				<tbody>
 					<tr>
 						<td>Numero du compteur</td>
-						<td class="LINKY_ADCO" colspan="2">Erreur javascript est obligatoire</td>
+						<td class="LINKY_ADCO">Erreur javascript est obligatoire</td>
 					</tr>
 					<tr>
 						<td>Consomation actuelle</td>
-						<td class="LINKY_PAPP" colspan="2">Erreur javascript est obligatoire</td>
+						<td class="LINKY_PAPP">Erreur javascript est obligatoire</td>
 					</tr>
 					<tr>
 						<td>Consomation heures creuse</td>
-						<td class="LINKY_HCHC" colspan="2">Erreur javascript est obligatoire</td>
+						<td class="LINKY_HCHC">Erreur javascript est obligatoire</td>
 					</tr>
 					<tr>
 						<td>Consomation heures pleine</td>
-						<td class="LINKY_HCHP" colspan="2">Erreur javascript est obligatoire</td>
+						<td class="LINKY_HCHP">Erreur javascript est obligatoire</td>
 					</tr>
 
 				</tbody>
 			</table>
+			<canvas id="PAPPChart" width="100%" height="30%"></canvas>
 		</div>
 		<div id="page_advanced" style="display: none;  height: 0px" >
 			<table class="table table-bordered ">
@@ -141,11 +326,6 @@
 					<tr>
 						<th style="vertical-align: middle;">Intituler</th>
 						<th style="vertical-align: middle; border-right: none;">Valeur</th>
-						<th class="col-1" style="border-left: none;">
-							<button type="button" onclick="update()" class="float-right m-0 p-2 btn btn-success">
-								<i class="updateIcon fas fa-sync-alt fa-2x"></i>
-							</button>
-						</th>
 					</tr>
 				</thead>
 				<tbody id="page_advanced_ids">
@@ -155,6 +335,7 @@
 		</div>
 		<div id="page_info" style="display: none;  height: 0px" >
 			<h3>Information sur le module LinkyLink:</h3>
+			<hr>
 			<table>
 				<tr>
 					<td>Version du logiciel: </td>
@@ -169,13 +350,24 @@
 					<td id="info_uptime" >UNKNOWN</td>
 				</tr>
 				<tr>
-					<td>Serial number: </td>
+					<td>Derniere mise a jour: </td>
+					<td id="info_lastUpdate" >UNKNOWN</td>
+				</tr>
+				<tr>
+					<td>Numero de serie: </td>
 					<td id="info_serial" >UNKNOWN</td>
 				</tr>
 			</table>
+
 			<h3 style="margin-top: 20px;">Un probleme / contact:</h3>
+			<hr>
 			Le github: <a href="https://github.com/TurtleForGaming/LinkyLink">https://github.com/TurtleForGaming/LinkyLink</a><br>
 			Envoyer un mail: <a href="mailto:samuel@turtleforgaming.fr">samuel@turtleforgaming.fr</a><br>
+
+			<h3 style="margin-top: 20px;">Danger zone:</h3>
+			<hr>
+			<button onclick="reboot()" class="btn btn-danger">Reboot</button>
+			<button onclick="debug()" class="btn btn-secondary">Debug</button>
 		</div>
 
 
