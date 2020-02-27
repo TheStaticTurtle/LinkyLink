@@ -3,9 +3,10 @@
 
 #include <SoftwareSerial.h>
 
-Linky::Linky(int RXPin, int TXPin) {
+Linky::Linky(int RXPin, int TXPin,int DATAENpin) {
 	_pin_RX = RXPin;
 	_pin_TX = TXPin;
+	_DATAENpin = DATAENpin;
 	_serport = new SoftwareSerial(_pin_RX, _pin_TX); // RX, TX
 }
 
@@ -52,17 +53,31 @@ long Linky::getCommandValue_long(String CMD, int CMDlenght, int CMDResultLenght,
   return (long)raw_value.toInt();
 }
 
-bool Linky::getCommandValue_str(String CMD, int CMDlenght, int CMDResultLenght, String line, int lineLenght, char* value) {
-  if(!line.startsWith(CMD)) { return false; }
-  if(CMDlenght+1+CMDResultLenght > lineLenght) { return false; } // Invalid size line length too short
-  
-  line.substring(CMDlenght+1, CMDlenght+1+CMDResultLenght).toCharArray(value,CMDResultLenght+1);
-  return true;
+bool Linky::validateInput(String input, bool hasLetters, bool hasNumbers, bool hasSpecial) {
+	for(char i=0;i<input.length();i++) {
+		char c = input.charAt(i);
+		if( isGraph(c) && ( (isAlpha(c) && hasLetters) || (isDigit(c) && hasNumbers) || (isAscii(c) && hasSpecial) )  ) { } else {
+			return false;
+		}
+	}
+	return true;
+}
+bool Linky::getCommandValue_str(String CMD, int CMDlenght, int CMDResultLenght, String line, int lineLenght, char* value, bool hasLetters, bool hasNumbers, bool hasSpecial) {
+	if(!line.startsWith(CMD)) { return false; }
+	if(CMDlenght+1+CMDResultLenght > lineLenght) { return false; } // Invalid size line length too short
+
+	if(validateInput( line.substring(CMDlenght+1, CMDlenght+1+CMDResultLenght), hasLetters, hasNumbers, hasSpecial)) {
+		line.substring(CMDlenght+1, CMDlenght+1+CMDResultLenght).toCharArray(value,CMDResultLenght+1);
+		return true;
+	}
+
+	return false;
 } 
 
+
 void Linky::updateStruct(int len) {
-						getCommandValue_str ("ADCO"    , 4,12,_buffer,len+1, _data.ADCO     );
-						getCommandValue_str ("OPTARIF" , 7, 4,_buffer,len+1, _data.OPTARIF  );
+						getCommandValue_str ("ADCO"    , 4,12,_buffer,len+1, _data.ADCO    , false, true, false );
+						getCommandValue_str ("OPTARIF" , 7, 4,_buffer,len+1, _data.OPTARIF , true, false, true );
 	_data.ISOUSC 	=	getCommandValue_int ("ISOUSC"  , 6, 2,_buffer,len+1, _data.ISOUSC);
 	_data.HCHC   	=	getCommandValue_long("HCHC"    , 4, 9,_buffer,len+1, _data.HCHC);
 	_data.HCHP   	=	getCommandValue_long("HCHP"    , 4, 9,_buffer,len+1, _data.HCHP);
@@ -75,8 +90,8 @@ void Linky::updateStruct(int len) {
 	_data.BBRHCJR	=	getCommandValue_long("BBRHCJR" , 7, 9,_buffer,len+1, _data.BBRHCJR);
 	_data.BBRHPJR	=	getCommandValue_long("BBRHPJR" , 7, 9,_buffer,len+1, _data.BBRHPJR);
 	_data.PEJP   	=	getCommandValue_int ("PEJP"    , 4, 2,_buffer,len+1, _data.HCHP);
-						getCommandValue_str ("PTEC"    , 4, 4,_buffer,len+1, _data.PTEC  );
-						getCommandValue_str ("DEMAIN"  , 6, 4,_buffer,len+1, _data.DEMAIN  );
+						getCommandValue_str ("PTEC"    , 4, 4,_buffer,len+1, _data.PTEC    , true, false, true  );
+						getCommandValue_str ("DEMAIN"  , 6, 4,_buffer,len+1, _data.DEMAIN  , true, false, true  );
 	_data.IINST     = 	getCommandValue_int ("IINST"   , 5, 3,_buffer,len+1, _data.IINST); 
 	_data.IINST1    = 	getCommandValue_int ("IINST1"  , 6, 3,_buffer,len+1, _data.IINST1); 
 	_data.IINST2    = 	getCommandValue_int ("IINST2"  , 6, 3,_buffer,len+1, _data.IINST2); 
@@ -91,8 +106,8 @@ void Linky::updateStruct(int len) {
 	_data.IMAX3     = 	getCommandValue_int ("IMAX3"   , 5, 3,_buffer,len+1, _data.IMAX3); 
 	_data.PMAX      = 	getCommandValue_long("PMAX"    , 4, 5,_buffer,len+1, _data.PMAX); 
 	_data.PAPP      = 	getCommandValue_long("PAPP"    , 4, 5,_buffer,len+1, _data.PAPP); 
-						getCommandValue_str ("MOTDETAT", 8, 6,_buffer,len+1, _data.MOTDETAT );
-						getCommandValue_str ("PPOT"    , 4, 2,_buffer,len+1, _data.PPOT);
+	// 					getCommandValue_str ("MOTDETAT", 8, 6,_buffer,len+1, _data.MOTDETAT , true, true, true );
+	// 					getCommandValue_str ("PPOT"    , 4, 2,_buffer,len+1, _data.PPOT     , true, true, true );
 }
 
 void Linky::processRXChar(char currentChar) {
@@ -123,16 +138,18 @@ void Linky::processRXChar(char currentChar) {
 
 	}
 }
-void Linky::updateAsync() {
+bool Linky::updateAsync() {
 	if(_serport->available()) {
 		char currentChar;
 
 		currentChar = _serport->read() & 0x7F;
 		processRXChar(currentChar);
+		return currentChar == LINKY_END_FRAME || currentChar == LINKY_END_DATA;
 	}
+	return false;
 }
 
-void Linky::updateAsync(int blinkPin, bool invert) {
+bool Linky::updateAsync(int blinkPin, bool invert) {
 	if(_serport->available()) {
 		char currentChar;
 
@@ -143,10 +160,28 @@ void Linky::updateAsync(int blinkPin, bool invert) {
 			digitalWrite(blinkPin,!invert);
 		} else if(currentChar == LINKY_END_FRAME || currentChar == LINKY_END_DATA) {
 			digitalWrite(blinkPin,invert);
+			_lastFrame = millis();
+		}
+		return currentChar == LINKY_END_FRAME || currentChar == LINKY_END_DATA;
+	}
+	return false;
+}
+
+time_t Linky::lastFullFrame() {
+	return millis() - _lastFrame;
+}
+void Linky::waitEndMessage() {
+	char currentChar;
+	while(true) {
+		digitalWrite(_DATAENpin, false);
+		if(_serport->available()) {
+			currentChar = _serport->read() & 0x7F;
+			if(currentChar == LINKY_END_FRAME || currentChar == LINKY_END_DATA) {
+				return;
+			}
 		}
 	}
 }
-
 /*
 void Linky::update(int timeout) {
 	char currentChar;

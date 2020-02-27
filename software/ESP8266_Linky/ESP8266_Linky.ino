@@ -9,6 +9,7 @@
 #include <ArduinoOTA.h>
 #include <WiFiUdp.h>
 #include <Ticker.h>
+#include <SPIFFSLogger.h>
 
 #include "linky.h"
 
@@ -20,9 +21,11 @@ const int   PINS_LED_STATUS_WIFI = D3;
 const int   PINS_LED_STATUS_LINK = D5;
 const int   PINS_LED_STATUS_ERR  = D4;
 const int   PINS_CTRL_DATA_IN    = D6;
+const int   LOGGING_INTERVAL     = 10000;
+const int   LOGGING_DAY_KEPT     = 1;
+const char* LOGGING_FOLDER       = "/log/linkydata";
 
-
-Linky mLinky(D7,-1);
+Linky mLinky(D7,-1,PINS_CTRL_DATA_IN);
 AsyncWebServer server(80);
 DNSServer dns;
 Ticker tickerWifiLed;
@@ -34,17 +37,75 @@ const size_t ApiJsonTemplate_capacity = 31*JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZ
 DynamicJsonDocument ApiJsonTemplate_doc(ApiJsonTemplate_capacity);
 bool ApiJsonTemplate_IsThisShitSetup = false;
 
+struct LoggingData
+{
+	long PAPP;
+};
+
+SPIFFSLogger<LoggingData> logger(LOGGING_FOLDER, LOGGING_DAY_KEPT);
+
+
+
+void handleAPI_Reboot(AsyncWebServerRequest *request) {
+	Serial.println("[WEB] Serving 200 for: /api/reboot");
+	Serial.flush();
+
+	AsyncResponseStream *response = request->beginResponseStream("plain/text");
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Origin", "*");
+	response->printf("REBOOTING");
+	request->send(response);
+
+	ESP.restart();
+	lastRequestCounter = millis();
+	shouldReEnableListingToLinky = true;
+}
+
 void handleAPI_Info(AsyncWebServerRequest *request) {
-	Serial.println("*WEB: Serving 200 for: /api/info");
+	Serial.println("[WEB] Serving 200 for: /api/info");
 	Serial.flush();
 	AsyncResponseStream *response = request->beginResponseStream("application/json");
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Origin", "*");
 	
 	StaticJsonDocument<200> doc;
 	doc["serial_number"]    = MODULE_SERIAL_NUM;
 	doc["version_software"] = MODULE_VERSION_SOFT;
 	doc["version_hardware"] = MODULE_VERSION_HARD;
 	doc["uptime"]           = millis() / 1000;
+	doc["lastUpdate"]       = mLinky.lastFullFrame() /1000;
+	
+	serializeJson(doc, *response);
 
+	request->send(response);
+	lastRequestCounter = millis();
+	shouldReEnableListingToLinky = true;
+}
+
+void handleAPI_Debug(AsyncWebServerRequest *request) {
+	Serial.println("[WEB] Serving 200 for: /api/debug");
+	Serial.flush();
+	AsyncResponseStream *response = request->beginResponseStream("application/json");
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Origin", "*");
+	
+	StaticJsonDocument<200> doc;
+	doc["serial_number"]     = MODULE_SERIAL_NUM;
+	doc["version_software"]  = MODULE_VERSION_SOFT;
+	doc["version_hardware"]  = MODULE_VERSION_HARD;
+	doc["uptime"]            = millis() / 1000;
+	doc["lastUpdate"]        = mLinky.lastFullFrame() /1000;
+	doc["wifi_status"]       = WiFi.status();
+	doc["wifi_macaddr"]      = WiFi.macAddress();
+	doc["free_heap"]         = ESP.getFreeHeap();
+	doc["max_block_size"]    = ESP.getMaxFreeBlockSize();
+	doc["last_reset_cause"]  = ESP.getResetReason();
+	doc["core_version"]      = ESP.getCoreVersion();
+	doc["vcc"]               = ESP.getVcc();
+	
 	serializeJson(doc, *response);
 
 	request->send(response);
@@ -53,7 +114,7 @@ void handleAPI_Info(AsyncWebServerRequest *request) {
 }
 
 void handleAPI_Linky(AsyncWebServerRequest *request) {
-	Serial.println("*WEB: Serving 200 for: /api/linky");
+	Serial.println("[WEB] Serving 200 for: /api/linky");
 	Serial.flush();
 
 	LinkyData linkyData = mLinky.grab();
@@ -95,7 +156,7 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 
 		AsyncWebServerResponse *response = request->beginResponse(200,"text/plain",output);
 		response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-   	 	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+		response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 		response->addHeader("Access-Control-Allow-Origin", "*");
 		request->send(response);
 
@@ -103,7 +164,7 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 
 		if(ApiJsonTemplate_IsThisShitSetup == false) {
 			digitalWrite(PINS_CTRL_DATA_IN,true);
-			Serial.println("*WEB: Api tempalte not cached yet.");
+			Serial.println("[WEB] Api tempalte not cached yet.");
 			if(!SPIFFS.begin()) { request->send(520, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_FS_MOUNT\"}")); return; }
 			if(!SPIFFS.exists("/api_template.json")) { request->send(520, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_EXIST\"}")); return; }
 
@@ -114,10 +175,10 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 			ApiJsonTemplate_IsThisShitSetup = true;
 			file.close();
 		} else {
-			Serial.println("*WEB: Api template cached.");
+			Serial.println("[WEB] Api template cached.");
 		}
 
-		ApiJsonTemplate_doc["ADCO"   ]["value"] = linkyData.ADCO;
+		ApiJsonTemplate_doc["ADCO"   ]["value"] = String(linkyData.ADCO);
 		ApiJsonTemplate_doc["OPTARIF"]["value"] = linkyData.OPTARIF;
 		ApiJsonTemplate_doc["ISOUSC" ]["value"] = linkyData.ISOUSC;
 		ApiJsonTemplate_doc["HCHC"   ]["value"] = linkyData.HCHC;
@@ -152,7 +213,7 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 
 		AsyncResponseStream *response = request->beginResponseStream("application/json");
 		response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-	    response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+		response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 		response->addHeader("Access-Control-Allow-Origin", "*");
 		serializeJson(ApiJsonTemplate_doc, *response);
 		request->send(response);
@@ -163,17 +224,125 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 	//digitalWrite(PINS_CTRL_DATA_IN,false);
 }
 
+float max(float a, float b) {
+	if( a > b ) { return a; }
+	return b;
+}
+
+void pathFromDate(char *output, time_t date)
+{
+    struct tm *tinfo = gmtime(&date);
+    sprintf_P(output,
+              "%s/%d%02d%02d",
+              "/log/linkydata",
+              1900 + tinfo->tm_year,
+              tinfo->tm_mon + 1,
+              tinfo->tm_mday);
+}
+
+void handleAPI_History(AsyncWebServerRequest *request) {
+	digitalWrite(PINS_CTRL_DATA_IN,true);
+	Serial.println("[WEB] Serving 200 for: /api/history");
+	Serial.flush();
+
+	const time_t todayTime = time(nullptr);
+	const time_t yesterday = todayTime - 3600 * 24;
+	const size_t rowCountY = logger.rowCount(yesterday);
+	const size_t rowCountT = logger.rowCount(todayTime);
+
+	struct SPIFFSLogData<LoggingData> readback;
+
+	AsyncResponseStream *response = request->beginResponseStream("text/plain");
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Origin", "*");
+
+	//RESPONSE V2 - Optimized - Fast re-implementation of SPIFFSLogger read for this use case (Mainly not opening and closing the file at each read)
+	int count = 1111;
+	float step = (float)(rowCountY+rowCountT) / (float)count;
+	time_t begin_time = 0;
+	time_t end_time = 0;
+
+	response->printf("{\"data\":[");
+
+	unsigned long valuesSmoothSum = 0;
+	int valuesCount = 0;
+	float counter = 0;
+
+
+    size_t size = sizeof(SPIFFSLogData<LoggingData>);
+	char path[32];
+	pathFromDate(path,yesterday);
+	if(SPIFFS.exists(path)) {
+    	File f = SPIFFS.open(path, "r");
+
+		for(int i=0; i <  rowCountY ; i++ ) {
+		    f.seek(i * size);
+		    f.read((uint8_t *)&readback , size);
+
+
+			if(i == 0) { begin_time = readback.timestampUTC; }
+			end_time = readback.timestampUTC;
+			valuesSmoothSum += readback.data.PAPP;
+			valuesCount ++;
+
+			counter ++;
+
+			if(counter > step) {
+				response->printf("%lu,", (valuesSmoothSum / valuesCount) );
+				valuesSmoothSum = readback.data.PAPP;
+				valuesCount = 1;
+				counter-=step;
+			}
+
+		}
+		f.close();
+	}
+
+	pathFromDate(path,todayTime);
+	if(SPIFFS.exists(path)) {
+    	File f = SPIFFS.open(path, "r");
+
+		for(int i=0; i <  rowCountT ; i++ ) {
+		    f.seek(i * size);
+		    f.read((uint8_t *)&readback , size);
+
+			if(i == 0 && begin_time == 0) { begin_time = readback.timestampUTC; }
+			end_time = readback.timestampUTC;
+			valuesSmoothSum += readback.data.PAPP;
+			valuesCount ++;
+
+			counter ++;
+
+			if(counter > step) {
+				response->printf("%lu,", (valuesSmoothSum / valuesCount) );
+				valuesSmoothSum = readback.data.PAPP;
+				valuesCount = 1;
+				counter-=step;
+			}
+		}
+		f.close();
+	}
+
+	response->printf("], \"db_value_count\": %d,\"result_steps\": %f, \"begin_time\": %lu, \"end_time\": %lu}",(rowCountY+rowCountT),step,begin_time,end_time);
+
+	request->send(response);
+
+	lastRequestCounter = millis();
+	shouldReEnableListingToLinky = true;
+}
+
 
 void sendFileToServer(char* filename, AsyncWebServerRequest *request) {
 	digitalWrite(PINS_CTRL_DATA_IN,true);
 
-	Serial.println("*WEB: Serving 200 for url: "+request->url());
+	Serial.println("[WEB] Serving 200 for url: "+request->url());
 	Serial.flush();
 
 	AsyncWebServerResponse *response = request->beginResponse(SPIFFS, filename);
 	
 	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-    response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 	response->addHeader("Access-Control-Allow-Origin", "*");
 
 	request->send(response);
@@ -184,9 +353,9 @@ void sendFileToServer(char* filename, AsyncWebServerRequest *request) {
 
 void handleNotFound( AsyncWebServerRequest *request) {
 	digitalWrite(PINS_CTRL_DATA_IN,true);
-	Serial.println("*WEB: Serving 404 for url: "+request->url());
+	Serial.println("[WEB] Serving 404 for url: "+request->url());
 	Serial.flush();
-    request->send(404, "text/plain", "File "+request->url()+" not found");
+	request->send(404, "text/plain", "File "+request->url()+" not found");
 	lastRequestCounter = millis();
 	shouldReEnableListingToLinky = true;
 	//digitalWrite(PINS_CTRL_DATA_IN,false);
@@ -222,12 +391,15 @@ void setup() {
 	Serial.begin(115200);
 	Serial.println();
 	Serial.println();
-	Serial.println("Begin");
+	Serial.println("Booting up....");
 	
 	SPIFFS.begin();
+
+	logger.init();
 	
 	Dir dir = SPIFFS.openDir("/");
-	while (dir.next()) { Serial.print(dir.fileName());  Serial.print(" / "); Serial.println(dir.fileSize()); }
+	Serial.println("[SPIFFS] Files in memory: ");
+	while (dir.next()) { Serial.print("\t"); Serial.print(dir.fileName());  Serial.print(" / "); Serial.println(dir.fileSize()); }
 
 	tickerWifiLed.attach(0.6, tickWifiLed);
 
@@ -236,61 +408,68 @@ void setup() {
 	wifiManager.setAPCallback(configModeCallback);
 	wifiManager.setConfigPortalTimeout(180);
 
+	WiFi.hostname(MODULE_SERIAL_NUM);
+
 	if (!wifiManager.autoConnect(MODULE_SERIAL_NUM, "LinkyLinkSetup")) {
-		Serial.println("failed to connect and hit timeout");
+		Serial.println("[WiFi] Failed to connect and hit timeout");
 		digitalWrite(PINS_LED_STATUS_ERR ,true);
 		ESP.reset(); delay(1000);
 	}
-
 	tickerWifiLed.detach();
 	digitalWrite(PINS_LED_STATUS_WIFI, true);
 
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
+	Serial.print("[WiFi] IP Address: ");
+	Serial.println(WiFi.localIP());
 
-	if (MDNS.begin("LinkyLink")) { Serial.println("MDNS responder started"); }
+	configTime(0, 0, "pool.ntp.org");
+
+	if (MDNS.begin("LinkyLink")) { Serial.println("[MDNS] Begin ok"); } else  { Serial.println("[MDNS] Begin failed"); }
 	
 	server.on("/"                 , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/index.html"       ,request); });
 	server.on("/logo.svg"         , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/logo.svg"         ,request); });
 	server.on("/fa-solid-900.ttf" , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/fa-solid-900.ttf" ,request); });
 	server.on("/js.js"            , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/js.js"            ,request); });
 	server.on("/css.css"          , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/css.css"          ,request); });
+	server.on("/favicon.png"      , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/favicon.png"      ,request); });
 	server.on("/api/linky"        , HTTP_GET, handleAPI_Linky);
 	//server.on("/api/linky_custom" , HTTP_GET, handleAPI_LinkyCustom);
 	server.on("/api/info"         , HTTP_GET, handleAPI_Info);
+	server.on("/api/debug"        , HTTP_GET, handleAPI_Debug);
+	server.on("/api/history"      , HTTP_GET, handleAPI_History);
+	server.on("/api/reboot"      , HTTP_GET, handleAPI_Reboot);
 	server.onNotFound(handleNotFound);
 
 	server.begin();
 
-	Serial.println(F("*WEB: Begin ok"));
+	Serial.println(F("[WEB] Begin"));
 
 	ArduinoOTA.setHostname("LinkyLink");
-	ArduinoOTA.setPassword("admin");
+	// ArduinoOTA.setPassword("admin");
 
 	ArduinoOTA.onStart([]() {
 		String type;
 		if (ArduinoOTA.getCommand() == U_FLASH) { type = "sketch"; } 
 		else { type = "filesystem"; }
-		Serial.println("Start updating " + type);
+		Serial.println("[OTA] Start updating " + type);
 	});
 	ArduinoOTA.onEnd([]() {  Serial.println("\nEnd"); });
-	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); });
+	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) { Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100))); });
 	ArduinoOTA.onError([](ota_error_t error) {
-		Serial.printf("Error[%u]: ", error);
+		Serial.printf("[OTA] Error[%u]: ", error);
 		if (error == OTA_AUTH_ERROR) {
-			Serial.println("Auth Failed");
+			Serial.println("[OTA] Auth Failed");
 		} else if (error == OTA_BEGIN_ERROR) {
-			Serial.println("Begin Failed");
+			Serial.println("[OTA] Begin Failed");
 		} else if (error == OTA_CONNECT_ERROR) {
-			Serial.println("Connect Failed");
+			Serial.println("[OTA] Connect Failed");
 		} else if (error == OTA_RECEIVE_ERROR) {
-			Serial.println("Receive Failed");
+			Serial.println("[OTA] Receive Failed");
 		} else if (error == OTA_END_ERROR) {
-			Serial.println("End Failed");
+			Serial.println("[OTA] End Failed");
 		}
 	});
 	ArduinoOTA.begin();
-	Serial.println(F("*OTA: Begin ok"));
+	Serial.println(F("[OTA] Begin"));
 
 	mLinky.begin();
 	Serial.println(F("LinkyLink V1 is in the place"));
@@ -298,64 +477,129 @@ void setup() {
 
 /*
 void dumpStruct(LinkyData linkyData) {
-	Serial.print(F("linkyData.ADCO     => ")); Serial.println(linkyData.ADCO);
-	Serial.print(F("linkyData.OPTARIF  => ")); Serial.println(linkyData.OPTARIF);
-	Serial.print(F("linkyData.ISOUSC   => ")); Serial.println(linkyData.ISOUSC);
-	Serial.print(F("linkyData.HCHC     => ")); Serial.println(linkyData.HCHC);
-	Serial.print(F("linkyData.HCHP     => ")); Serial.println(linkyData.HCHP);
-	Serial.print(F("linkyData.EJPHN    => ")); Serial.println(linkyData.EJPHN);
-	Serial.print(F("linkyData.EJPHPM   => ")); Serial.println(linkyData.EJPHPM);
-	Serial.print(F("linkyData.BBRHCJB  => ")); Serial.println(linkyData.BBRHCJB);
-	Serial.print(F("linkyData.BBRHPJB  => ")); Serial.println(linkyData.BBRHPJB);
-	Serial.print(F("linkyData.BBRHCJW  => ")); Serial.println(linkyData.BBRHCJW);
-	Serial.print(F("linkyData.BBRHPJW  => ")); Serial.println(linkyData.BBRHPJW);
-	Serial.print(F("linkyData.BBRHCJR  => ")); Serial.println(linkyData.BBRHCJR);
-	Serial.print(F("linkyData.BBRHPJR  => ")); Serial.println(linkyData.BBRHPJR);
-	Serial.print(F("linkyData.PEJP     => ")); Serial.println(linkyData.PEJP);
-	Serial.print(F("linkyData.PTEC     => ")); Serial.println(linkyData.PTEC);
-	Serial.print(F("linkyData.DEMAIN   => ")); Serial.println(linkyData.DEMAIN);
-	Serial.print(F("linkyData.IINST    => ")); Serial.println(linkyData.IINST);
-	Serial.print(F("linkyData.IINST1   => ")); Serial.println(linkyData.IINST1);
-	Serial.print(F("linkyData.IINST2   => ")); Serial.println(linkyData.IINST2);
-	Serial.print(F("linkyData.IINST3   => ")); Serial.println(linkyData.IINST3);
-	Serial.print(F("linkyData.ADPS     => ")); Serial.println(linkyData.ADPS);
-	Serial.print(F("linkyData.ADIR1    => ")); Serial.println(linkyData.ADIR1);
-	Serial.print(F("linkyData.ADIR2    => ")); Serial.println(linkyData.ADIR2);
-	Serial.print(F("linkyData.ADIR3    => ")); Serial.println(linkyData.ADIR3);
-	Serial.print(F("linkyData.IMAX     => ")); Serial.println(linkyData.IMAX);
-	Serial.print(F("linkyData.IMAX1    => ")); Serial.println(linkyData.IMAX1);
-	Serial.print(F("linkyData.IMAX2    => ")); Serial.println(linkyData.IMAX2);
-	Serial.print(F("linkyData.IMAX3    => ")); Serial.println(linkyData.IMAX3);
-	Serial.print(F("linkyData.PMAX     => ")); Serial.println(linkyData.PMAX);
-	Serial.print(F("linkyData.PAPP     => ")); Serial.println(linkyData.PAPP);
-	Serial.print(F("linkyData.HHPHC    => ")); Serial.println(linkyData.HHPHC);
-	Serial.print(F("linkyData.MOTDETA  => ")); Serial.println(linkyData.MOTDETAT);
-	Serial.print(F("linkyData.PPOT     => ")); Serial.println(linkyData.PPOT);
+	Serial.print(F("[LINKY] Data dump incomming"));
+	Serial.print(F("[LINKY] linkyData.ADCO     => ")); Serial.println(linkyData.ADCO);
+	Serial.print(F("[LINKY] linkyData.OPTARIF  => ")); Serial.println(linkyData.OPTARIF);
+	Serial.print(F("[LINKY] linkyData.ISOUSC   => ")); Serial.println(linkyData.ISOUSC);
+	Serial.print(F("[LINKY] linkyData.HCHC     => ")); Serial.println(linkyData.HCHC);
+	Serial.print(F("[LINKY] linkyData.HCHP     => ")); Serial.println(linkyData.HCHP);
+	Serial.print(F("[LINKY] linkyData.EJPHN    => ")); Serial.println(linkyData.EJPHN);
+	Serial.print(F("[LINKY] linkyData.EJPHPM   => ")); Serial.println(linkyData.EJPHPM);
+	Serial.print(F("[LINKY] linkyData.BBRHCJB  => ")); Serial.println(linkyData.BBRHCJB);
+	Serial.print(F("[LINKY] linkyData.BBRHPJB  => ")); Serial.println(linkyData.BBRHPJB);
+	Serial.print(F("[LINKY] linkyData.BBRHCJW  => ")); Serial.println(linkyData.BBRHCJW);
+	Serial.print(F("[LINKY] linkyData.BBRHPJW  => ")); Serial.println(linkyData.BBRHPJW);
+	Serial.print(F("[LINKY] linkyData.BBRHCJR  => ")); Serial.println(linkyData.BBRHCJR);
+	Serial.print(F("[LINKY] linkyData.BBRHPJR  => ")); Serial.println(linkyData.BBRHPJR);
+	Serial.print(F("[LINKY] linkyData.PEJP     => ")); Serial.println(linkyData.PEJP);
+	Serial.print(F("[LINKY] linkyData.PTEC     => ")); Serial.println(linkyData.PTEC);
+	Serial.print(F("[LINKY] linkyData.DEMAIN   => ")); Serial.println(linkyData.DEMAIN);
+	Serial.print(F("[LINKY] linkyData.IINST    => ")); Serial.println(linkyData.IINST);
+	Serial.print(F("[LINKY] linkyData.IINST1   => ")); Serial.println(linkyData.IINST1);
+	Serial.print(F("[LINKY] linkyData.IINST2   => ")); Serial.println(linkyData.IINST2);
+	Serial.print(F("[LINKY] linkyData.IINST3   => ")); Serial.println(linkyData.IINST3);
+	Serial.print(F("[LINKY] linkyData.ADPS     => ")); Serial.println(linkyData.ADPS);
+	Serial.print(F("[LINKY] linkyData.ADIR1    => ")); Serial.println(linkyData.ADIR1);
+	Serial.print(F("[LINKY] linkyData.ADIR2    => ")); Serial.println(linkyData.ADIR2);
+	Serial.print(F("[LINKY] linkyData.ADIR3    => ")); Serial.println(linkyData.ADIR3);
+	Serial.print(F("[LINKY] linkyData.IMAX     => ")); Serial.println(linkyData.IMAX);
+	Serial.print(F("[LINKY] linkyData.IMAX1    => ")); Serial.println(linkyData.IMAX1);
+	Serial.print(F("[LINKY] linkyData.IMAX2    => ")); Serial.println(linkyData.IMAX2);
+	Serial.print(F("[LINKY] linkyData.IMAX3    => ")); Serial.println(linkyData.IMAX3);
+	Serial.print(F("[LINKY] linkyData.PMAX     => ")); Serial.println(linkyData.PMAX);
+	Serial.print(F("[LINKY] linkyData.PAPP     => ")); Serial.println(linkyData.PAPP);
+	Serial.print(F("[LINKY] linkyData.HHPHC    => ")); Serial.println(linkyData.HHPHC);
+	Serial.print(F("[LINKY] linkyData.MOTDETA  => ")); Serial.println(linkyData.MOTDETAT);
+	Serial.print(F("[LINKY] linkyData.PPOT     => ")); Serial.println(linkyData.PPOT);
 	Serial.println();
 	Serial.println();
-}
-*/
+}*/
 
+unsigned long lastLog = 0;
+
+time_t  _filenameToDate(const char *filename) {
+    struct tm tm = {0};
+    char datePart[5] = {0};
+    strncpy(datePart, filename, 4);
+    tm.tm_year = atoi(datePart) - 1900;
+    strncpy(datePart, filename + 4, 2);
+    datePart[2] = '\0';
+    tm.tm_mon = atoi(datePart) - 1;
+    strncpy(datePart, filename + 6, 2);
+    tm.tm_mday = atoi(datePart);
+    return _timegm(&tm) / 86400 * 86400;
+}
+time_t _timegm(struct tm *tm) {
+    struct tm start2000 = { 0,  0,  0, 1,  0,  100, 0, 0, 0,  };
+    return mktime(tm) - (mktime(&start2000) - 946684800);
+}
+void clearingOldLogFiles() {
+    const uint8_t dirLen = strlen(LOGGING_FOLDER);
+    Dir tempDir = SPIFFS.openDir(LOGGING_FOLDER);
+
+    while (tempDir.next())
+    {
+        const char *dateStart = tempDir.fileName().c_str() + dirLen + 1;
+        const time_t logdate = _filenameToDate(dateStart);
+        const time_t today = time(nullptr) / 86400 * 86400; // remove the time part
+
+        if (logdate < (today - LOGGING_DAY_KEPT * 86400)) {
+        	Serial.print("[DB] Removing old log file: ");
+        	Serial.println(tempDir.fileName());
+            SPIFFS.remove(tempDir.fileName());
+        }
+        #ifdef DEBUG
+	        else {
+	        	Serial.printf("[DB] %d / %d / %s / Log file: ",today,logdate,dateStart);
+	        	Serial.println(tempDir.fileName());
+	        }
+        #endif
+    }
+}
 
 void loop() {
-	//a = ESP.getFreeHeap();
 	ArduinoOTA.handle();
-	mLinky.updateAsync(PINS_LED_STATUS_LINK,true);
+	if( mLinky.updateAsync(PINS_LED_STATUS_LINK,true) ) {
+		Serial.println("[LINKY] Got frame");
+	}
 
 	if(((lastRequestCounter + 30000) < millis()) && shouldReEnableListingToLinky){
 		shouldReEnableListingToLinky = false;
 		digitalWrite(PINS_CTRL_DATA_IN,false);
+		Serial.println("[LINKY] Restoring connection");
+	} 
+	
+	#ifdef DEBUG
+		LinkyData data = mLinky.grab();
+		dumpStruct(data);
+	#endif
+
+	if(digitalRead(PINS_CTRL_DATA_IN) == false) {
+		if (millis() - lastLog > LOGGING_INTERVAL) {
+			mLinky.waitEndMessage();
+			digitalWrite(PINS_CTRL_DATA_IN,true);
+			Serial.println("[DB] Proccesing values");
+
+			LinkyData linkyData = mLinky.grab();
+			struct LoggingData data;
+
+			if(mLinky.lastFullFrame() > 10000) {
+				data.PAPP = 0;
+			} else {
+				data.PAPP = linkyData.PAPP;
+			}
+
+			logger.write(data);
+			lastLog = millis();
+
+			clearingOldLogFiles();
+			logger.process();
+
+			digitalWrite(PINS_CTRL_DATA_IN,false);
+			mLinky.waitEndMessage();
+			Serial.println("[DB] Done");
+		}
 	}
-	//LinkyData data = mLinky.grab();
-	//dumpStruct(data);
-	//delay(10);
 
 
-	//b = ESP.getFreeHeap();
-	//Serial.print("Memory leak: ");
-	//Serial.println(a-b);
-	//Serial.print("Heap left: ");
-	//Serial.println(b);
-	//Serial.println();
-	//Serial.println();
 }
