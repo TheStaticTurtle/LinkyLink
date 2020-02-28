@@ -106,8 +106,8 @@ void Linky::updateStruct(int len) {
 	_data.IMAX3     = 	getCommandValue_int ("IMAX3"   , 5, 3,_buffer,len+1, _data.IMAX3); 
 	_data.PMAX      = 	getCommandValue_long("PMAX"    , 4, 5,_buffer,len+1, _data.PMAX); 
 	_data.PAPP      = 	getCommandValue_long("PAPP"    , 4, 5,_buffer,len+1, _data.PAPP); 
-	// 					getCommandValue_str ("MOTDETAT", 8, 6,_buffer,len+1, _data.MOTDETAT , true, true, true );
-	// 					getCommandValue_str ("PPOT"    , 4, 2,_buffer,len+1, _data.PPOT     , true, true, true );
+						getCommandValue_str ("MOTDETAT", 8, 6,_buffer,len+1, _data.MOTDETAT , true, true, true );
+						getCommandValue_str ("PPOT"    , 4, 2,_buffer,len+1, _data.PPOT     , true, true, true );
 }
 
 void Linky::processRXChar(char currentChar) {

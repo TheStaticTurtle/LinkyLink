@@ -6,6 +6,43 @@
 	<link rel="stylesheet" type="text/css" href="css.css">
 	<link rel="icon" type="image/png" href="favicon.png">
 	<script type="text/javascript" src="js.js"></script>
+	<script>
+		API_TEMPLATE = {
+			"ADCO":     {"value":"............","unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"OPTARIF":  {"value":"....",        "unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"ISOUSC":   {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"HCHC":     {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"HCHP":     {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"EJPHN":    {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"EJPHPM":   {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"BBRHCJB":  {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"BBRHPJB":  {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"BBRHCJW":  {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"BBRHPJW":  {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"BBRHCJR":  {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"BBRHPJR":  {"value":0,             "unit":"Wh",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"PEJP":     {"value":0     ,        "unit":"min", "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"PTEC":     {"value":"....",        "unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"DEMAIN":   {"value":"",            "unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"IINST":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": true,  "disp3pMode": false },
+			"IINST1":   {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"IINST2":   {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"IINST3":   {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"ADPS":     {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": true,  "disp3pMode": false },
+			"ADIR1":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"ADIR2":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"ADIR3":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"IMAX":     {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": true,  "disp3pMode": false },
+			"IMAX1":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"IMAX2":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"IMAX3":    {"value":0,             "unit":"A",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"PMAX":     {"value":0,             "unit":"W",   "default":"Non transmit", "disp1pMode": false, "disp3pMode": true  },
+			"PAPP":     {"value":0,             "unit":"VA",  "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"HHPHC":    {"value":0,             "unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"MOTDETAT": {"value":"......",      "unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  },
+			"PPOT":     {"value":"..",            "unit":"",    "default":"Non transmit", "disp1pMode": true,  "disp3pMode": true  }
+		}
+	</script>
 	<script type="text/javascript">
 		jQuery.expr[':'].regex = function(elem, index, match) {
 		    var matchParams = match[3].split(','),
@@ -26,15 +63,16 @@
 			}
 		}
 
-		function autoUnit(value) {
-			if(value["value"] == 0 || value["value"] == "" || value["value"] == null) { return value["default"]}
-			if(typeof value["value"] == 'number' &&  ["Wh","A","W","VA"].includes(value["unit"]) ) {
-				if(value["value"] < 1000) {return value["value"]+" "+value["unit"]; }
-				if(value["value"] < 1000000) {return (value["value"]/1000)+" K"+value["unit"]; }
-				if(value["value"] < 1000000000) {return (value["value"]/1000000)+" M"+value["unit"]; }
-				if(value["value"] < 1000000000000) {return (value["value"]/1000000000)+" G"+value["unit"]; }
+		function autoUnit(value,key) {
+			if(value == 0 || value == "" || value == null) { return API_TEMPLATE[key]["default"]; }
+
+			if(typeof value == 'number' &&  ["Wh","A","W","VA"].includes(API_TEMPLATE[key]["unit"]) ) {
+				if(value < 1000) {return value+" "+API_TEMPLATE[key]["unit"]; }
+				if(value < 1000000) {return (value/1000)+" K"+API_TEMPLATE[key]["unit"]; }
+				if(value < 1000000000) {return (value/1000000)+" M"+API_TEMPLATE[key]["unit"]; }
+				if(value < 1000000000000) {return (value/1000000000)+" G"+API_TEMPLATE[key]["unit"]; }
 			} else {
-				return value["value"]+" "+value["unit"];
+				return value+" "+API_TEMPLATE[key]["unit"];
 			}
 		}
 
@@ -148,13 +186,13 @@
 			$.getJSON( "/api/linky", function( data ) {
 				for(var key in data) {
 					sel=document.querySelector(".LINKY_"+key)
-					if(sel) sel.innerHTML = autoUnit(data[key])
+					if(sel) sel.innerHTML = autoUnit(data[key],key)
 
 					tBody = document.getElementById("page_advanced_ids")
 					tBody.innerHTML = ""
 					for(var key in data) {
-						if(data[key]["disp3pMode"] == config["linky"]["is3pMode"] || data[key]["disp1pMode"] == !config["linky"]["is3pMode"]) {
-							tBody.innerHTML += "<tr><td>"+key+"</td> <td class=\"LINKY_"+key+"\">"+autoUnit(data[key])+"</td></tr>"
+						if(API_TEMPLATE[key]["disp3pMode"] == config["linky"]["is3pMode"] || API_TEMPLATE[key]["disp1pMode"] == !config["linky"]["is3pMode"]) {
+							tBody.innerHTML += "<tr><td>"+key+"</td> <td class=\"LINKY_"+key+"\">"+autoUnit(data[key],key)+"</td></tr>"
 						}
 					}
 

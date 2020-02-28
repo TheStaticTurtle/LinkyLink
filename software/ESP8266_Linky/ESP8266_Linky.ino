@@ -33,17 +33,13 @@ Ticker tickerWifiLed;
 long lastRequestCounter = 0;
 bool shouldReEnableListingToLinky = false;
 
-const size_t ApiJsonTemplate_capacity = 31*JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(31) + 2190;
-DynamicJsonDocument ApiJsonTemplate_doc(ApiJsonTemplate_capacity);
-bool ApiJsonTemplate_IsThisShitSetup = false;
+const size_t ApiJsonTemplate_capacity = JSON_OBJECT_SIZE(31) + 310;
 
-struct LoggingData
-{
+struct LoggingData {
 	long PAPP;
 };
 
 SPIFFSLogger<LoggingData> logger(LOGGING_FOLDER, LOGGING_DAY_KEPT);
-
 
 
 void handleAPI_Reboot(AsyncWebServerRequest *request) {
@@ -122,37 +118,39 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 	if(request->hasParam("key")) {
 		AsyncWebParameter* p = request->getParam("key");
 		String output = F("Key is invalid");
-		if(p->value() == "ADCO"   ) { output = linkyData.ADCO;    }   
-		if(p->value() == "OPTARIF") { output = linkyData.OPTARIF; }      
-		if(p->value() == "ISOUSC" ) { output = linkyData.ISOUSC;  }     
-		if(p->value() == "HCHC"   ) { output = linkyData.HCHC;    }   
-		if(p->value() == "HCHP"   ) { output = linkyData.HCHP;    }   
-		if(p->value() == "EJPHN"  ) { output = linkyData.EJPHN;   }    
-		if(p->value() == "EJPHPM" ) { output = linkyData.EJPHPM;  }     
-		if(p->value() == "BBRHCJB") { output = linkyData.BBRHCJB; }      
-		if(p->value() == "BBRHPJB") { output = linkyData.BBRHPJB; }      
-		if(p->value() == "BBRHCJW") { output = linkyData.BBRHCJW; }      
-		if(p->value() == "BBRHPJW") { output = linkyData.BBRHPJW; }      
-		if(p->value() == "BBRHCJR") { output = linkyData.BBRHCJR; }      
-		if(p->value() == "BBRHPJR") { output = linkyData.BBRHPJR; }      
-		if(p->value() == "PEJP"   ) { output = linkyData.PEJP;    }   
-		if(p->value() == "PTEC"   ) { output = linkyData.PTEC;    }   
-		if(p->value() == "DEMAIN" ) { output = linkyData.DEMAIN;  }     
-		if(p->value() == "IINST"  ) { output = linkyData.IINST;   }    
-		if(p->value() == "IINST1" ) { output = linkyData.IINST1;  }     
-		if(p->value() == "IINST2" ) { output = linkyData.IINST2;  }     
-		if(p->value() == "IINST3" ) { output = linkyData.IINST3;  }     
-		if(p->value() == "ADPS"   ) { output = linkyData.ADPS;    }   
-		if(p->value() == "ADIR1"  ) { output = linkyData.ADIR1;   }    
-		if(p->value() == "ADIR2"  ) { output = linkyData.ADIR2;   }    
-		if(p->value() == "ADIR3"  ) { output = linkyData.ADIR3;   }    
-		if(p->value() == "IMAX"   ) { output = linkyData.IMAX;    }
-		if(p->value() == "IMAX1"  ) { output = linkyData.IMAX1;   }
-		if(p->value() == "IMAX2"  ) { output = linkyData.IMAX2;   }
-		if(p->value() == "IMAX3"  ) { output = linkyData.IMAX3;   }    
-		if(p->value() == "PMAX"   ) { output = linkyData.PMAX;    }
-		if(p->value() == "PAPP"   ) { output = linkyData.PAPP;    }
-		if(p->value() == "HHPHC"  ) { output = linkyData.HHPHC;   }
+		if(p->value() == "ADCO"    ) { output = linkyData.ADCO;    }   
+		if(p->value() == "OPTARIF" ) { output = linkyData.OPTARIF; }      
+		if(p->value() == "ISOUSC"  ) { output = linkyData.ISOUSC;  }     
+		if(p->value() == "HCHC"    ) { output = linkyData.HCHC;    }   
+		if(p->value() == "HCHP"    ) { output = linkyData.HCHP;    }   
+		if(p->value() == "EJPHN"   ) { output = linkyData.EJPHN;   }    
+		if(p->value() == "EJPHPM"  ) { output = linkyData.EJPHPM;  }     
+		if(p->value() == "BBRHCJB" ) { output = linkyData.BBRHCJB; }      
+		if(p->value() == "BBRHPJB" ) { output = linkyData.BBRHPJB; }      
+		if(p->value() == "BBRHCJW" ) { output = linkyData.BBRHCJW; }      
+		if(p->value() == "BBRHPJW" ) { output = linkyData.BBRHPJW; }      
+		if(p->value() == "BBRHCJR" ) { output = linkyData.BBRHCJR; }      
+		if(p->value() == "BBRHPJR" ) { output = linkyData.BBRHPJR; }      
+		if(p->value() == "PEJP"    ) { output = linkyData.PEJP;    }   
+		if(p->value() == "PTEC"    ) { output = linkyData.PTEC;    }   
+		if(p->value() == "DEMAIN"  ) { output = linkyData.DEMAIN;  }     
+		if(p->value() == "IINST"   ) { output = linkyData.IINST;   }    
+		if(p->value() == "IINST1"  ) { output = linkyData.IINST1;  }     
+		if(p->value() == "IINST2"  ) { output = linkyData.IINST2;  }     
+		if(p->value() == "IINST3"  ) { output = linkyData.IINST3;  }     
+		if(p->value() == "ADPS"    ) { output = linkyData.ADPS;    }   
+		if(p->value() == "ADIR1"   ) { output = linkyData.ADIR1;   }    
+		if(p->value() == "ADIR2"   ) { output = linkyData.ADIR2;   }    
+		if(p->value() == "ADIR3"   ) { output = linkyData.ADIR3;   }    
+		if(p->value() == "IMAX"    ) { output = linkyData.IMAX;    }
+		if(p->value() == "IMAX1"   ) { output = linkyData.IMAX1;   }
+		if(p->value() == "IMAX2"   ) { output = linkyData.IMAX2;   }
+		if(p->value() == "IMAX3"   ) { output = linkyData.IMAX3;   }    
+		if(p->value() == "PMAX"    ) { output = linkyData.PMAX;    }
+		if(p->value() == "PAPP"    ) { output = linkyData.PAPP;    }
+		if(p->value() == "HHPHC"   ) { output = linkyData.HHPHC;   }
+		if(p->value() == "MOTDETAT") { output = linkyData.MOTDETAT;   }
+		if(p->value() == "PPOT"    ) { output = linkyData.PPOT;   }
 
 		AsyncWebServerResponse *response = request->beginResponse(200,"text/plain",output);
 		response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
@@ -161,55 +159,40 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 		request->send(response);
 
 	} else {
-
-		if(ApiJsonTemplate_IsThisShitSetup == false) {
-			digitalWrite(PINS_CTRL_DATA_IN,true);
-			Serial.println("[WEB] Api tempalte not cached yet.");
-			if(!SPIFFS.begin()) { request->send(520, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_FS_MOUNT\"}")); return; }
-			if(!SPIFFS.exists("/api_template.json")) { request->send(520, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_EXIST\"}")); return; }
-
-			File file = SPIFFS.open("/api_template.json", "r");
-			if (!file) { request->send(503, "application/json", F("{\"ERROR\":\"SPIFFS_FAIL_READ\"}")); return;  }
-
-			deserializeJson(ApiJsonTemplate_doc, file);
-			ApiJsonTemplate_IsThisShitSetup = true;
-			file.close();
-		} else {
-			Serial.println("[WEB] Api template cached.");
-		}
-
-		ApiJsonTemplate_doc["ADCO"   ]["value"] = String(linkyData.ADCO);
-		ApiJsonTemplate_doc["OPTARIF"]["value"] = linkyData.OPTARIF;
-		ApiJsonTemplate_doc["ISOUSC" ]["value"] = linkyData.ISOUSC;
-		ApiJsonTemplate_doc["HCHC"   ]["value"] = linkyData.HCHC;
-		ApiJsonTemplate_doc["HCHP"   ]["value"] = linkyData.HCHP;
-		ApiJsonTemplate_doc["EJPHN"  ]["value"] = linkyData.EJPHN;
-		ApiJsonTemplate_doc["EJPHPM" ]["value"] = linkyData.EJPHPM;
-		ApiJsonTemplate_doc["BBRHCJB"]["value"] = linkyData.BBRHCJB;
-		ApiJsonTemplate_doc["BBRHPJB"]["value"] = linkyData.BBRHPJB;
-		ApiJsonTemplate_doc["BBRHCJW"]["value"] = linkyData.BBRHCJW;
-		ApiJsonTemplate_doc["BBRHPJW"]["value"] = linkyData.BBRHPJW;
-		ApiJsonTemplate_doc["BBRHCJR"]["value"] = linkyData.BBRHCJR;
-		ApiJsonTemplate_doc["BBRHPJR"]["value"] = linkyData.BBRHPJR;
-		ApiJsonTemplate_doc["PEJP"   ]["value"] = linkyData.PEJP;
-		ApiJsonTemplate_doc["PTEC"   ]["value"] = linkyData.PTEC;
-		ApiJsonTemplate_doc["DEMAIN" ]["value"] = linkyData.DEMAIN;
-		ApiJsonTemplate_doc["IINST"  ]["value"] = linkyData.IINST;
-		ApiJsonTemplate_doc["IINST1" ]["value"] = linkyData.IINST1;
-		ApiJsonTemplate_doc["IINST2" ]["value"] = linkyData.IINST2;
-		ApiJsonTemplate_doc["IINST3" ]["value"] = linkyData.IINST3;
-		ApiJsonTemplate_doc["ADPS"   ]["value"] = linkyData.ADPS;
-		ApiJsonTemplate_doc["ADIR1"  ]["value"] = linkyData.ADIR1;
-		ApiJsonTemplate_doc["ADIR2"  ]["value"] = linkyData.ADIR2;
-		ApiJsonTemplate_doc["ADIR3"  ]["value"] = linkyData.ADIR3;
-		ApiJsonTemplate_doc["IMAX"   ]["value"] = linkyData.IMAX;
-		ApiJsonTemplate_doc["IMAX1"  ]["value"] = linkyData.IMAX1;
-		ApiJsonTemplate_doc["IMAX2"  ]["value"] = linkyData.IMAX2;
-		ApiJsonTemplate_doc["IMAX3"  ]["value"] = linkyData.IMAX3;
-		ApiJsonTemplate_doc["PMAX"   ]["value"] = linkyData.PMAX;
-		ApiJsonTemplate_doc["PAPP"   ]["value"] = linkyData.PAPP;
-		ApiJsonTemplate_doc["HHPHC"  ]["value"] = linkyData.HHPHC;
-		
+		DynamicJsonDocument ApiJsonTemplate_doc(ApiJsonTemplate_capacity);
+		ApiJsonTemplate_doc["ADCO"    ] = linkyData.ADCO;
+		ApiJsonTemplate_doc["OPTARIF" ] = linkyData.OPTARIF;
+		ApiJsonTemplate_doc["ISOUSC"  ] = linkyData.ISOUSC;
+		ApiJsonTemplate_doc["HCHC"    ] = linkyData.HCHC;
+		ApiJsonTemplate_doc["HCHP"    ] = linkyData.HCHP;
+		ApiJsonTemplate_doc["EJPHN"   ] = linkyData.EJPHN;
+		ApiJsonTemplate_doc["EJPHPM"  ] = linkyData.EJPHPM;
+		ApiJsonTemplate_doc["BBRHCJB" ] = linkyData.BBRHCJB;
+		ApiJsonTemplate_doc["BBRHPJB" ] = linkyData.BBRHPJB;
+		ApiJsonTemplate_doc["BBRHCJW" ] = linkyData.BBRHCJW;
+		ApiJsonTemplate_doc["BBRHPJW" ] = linkyData.BBRHPJW;
+		ApiJsonTemplate_doc["BBRHCJR" ] = linkyData.BBRHCJR;
+		ApiJsonTemplate_doc["BBRHPJR" ] = linkyData.BBRHPJR;
+		ApiJsonTemplate_doc["PEJP"    ] = linkyData.PEJP;
+		ApiJsonTemplate_doc["PTEC"    ] = linkyData.PTEC;
+		ApiJsonTemplate_doc["DEMAIN"  ] = linkyData.DEMAIN;
+		ApiJsonTemplate_doc["IINST"   ] = linkyData.IINST;
+		ApiJsonTemplate_doc["IINST1"  ] = linkyData.IINST1;
+		ApiJsonTemplate_doc["IINST2"  ] = linkyData.IINST2;
+		ApiJsonTemplate_doc["IINST3"  ] = linkyData.IINST3;
+		ApiJsonTemplate_doc["ADPS"    ] = linkyData.ADPS;
+		ApiJsonTemplate_doc["ADIR1"   ] = linkyData.ADIR1;
+		ApiJsonTemplate_doc["ADIR2"   ] = linkyData.ADIR2;
+		ApiJsonTemplate_doc["ADIR3"   ] = linkyData.ADIR3;
+		ApiJsonTemplate_doc["IMAX"    ] = linkyData.IMAX;
+		ApiJsonTemplate_doc["IMAX1"   ] = linkyData.IMAX1;
+		ApiJsonTemplate_doc["IMAX2"   ] = linkyData.IMAX2;
+		ApiJsonTemplate_doc["IMAX3"   ] = linkyData.IMAX3;
+		ApiJsonTemplate_doc["PMAX"    ] = linkyData.PMAX;
+		ApiJsonTemplate_doc["PAPP"    ] = linkyData.PAPP;
+		ApiJsonTemplate_doc["HHPHC"   ] = linkyData.HHPHC;
+		ApiJsonTemplate_doc["MOTDETAT"] = linkyData.MOTDETAT;
+		ApiJsonTemplate_doc["PPOT"    ] = linkyData.PPOT;
 
 		AsyncResponseStream *response = request->beginResponseStream("application/json");
 		response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
@@ -221,7 +204,6 @@ void handleAPI_Linky(AsyncWebServerRequest *request) {
 
 	lastRequestCounter = millis();
 	shouldReEnableListingToLinky = true;
-	//digitalWrite(PINS_CTRL_DATA_IN,false);
 }
 
 float max(float a, float b) {
@@ -229,8 +211,7 @@ float max(float a, float b) {
 	return b;
 }
 
-void pathFromDate(char *output, time_t date)
-{
+void pathFromDate(char *output, time_t date) {
     struct tm *tinfo = gmtime(&date);
     sprintf_P(output,
               "%s/%d%02d%02d",
@@ -332,7 +313,6 @@ void handleAPI_History(AsyncWebServerRequest *request) {
 	shouldReEnableListingToLinky = true;
 }
 
-
 void sendFileToServer(char* filename, AsyncWebServerRequest *request) {
 	digitalWrite(PINS_CTRL_DATA_IN,true);
 
@@ -432,7 +412,7 @@ void setup() {
 	server.on("/css.css"          , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/css.css"          ,request); });
 	server.on("/favicon.png"      , HTTP_GET, [](AsyncWebServerRequest *request){ sendFileToServer("/www/favicon.png"      ,request); });
 	server.on("/api/linky"        , HTTP_GET, handleAPI_Linky);
-	//server.on("/api/linky_custom" , HTTP_GET, handleAPI_LinkyCustom);
+
 	server.on("/api/info"         , HTTP_GET, handleAPI_Info);
 	server.on("/api/debug"        , HTTP_GET, handleAPI_Debug);
 	server.on("/api/history"      , HTTP_GET, handleAPI_History);
@@ -475,48 +455,48 @@ void setup() {
 	Serial.println(F("LinkyLink V1 is in the place"));
 }
 
-/*
-void dumpStruct(LinkyData linkyData) {
-	Serial.print(F("[LINKY] Data dump incomming"));
-	Serial.print(F("[LINKY] linkyData.ADCO     => ")); Serial.println(linkyData.ADCO);
-	Serial.print(F("[LINKY] linkyData.OPTARIF  => ")); Serial.println(linkyData.OPTARIF);
-	Serial.print(F("[LINKY] linkyData.ISOUSC   => ")); Serial.println(linkyData.ISOUSC);
-	Serial.print(F("[LINKY] linkyData.HCHC     => ")); Serial.println(linkyData.HCHC);
-	Serial.print(F("[LINKY] linkyData.HCHP     => ")); Serial.println(linkyData.HCHP);
-	Serial.print(F("[LINKY] linkyData.EJPHN    => ")); Serial.println(linkyData.EJPHN);
-	Serial.print(F("[LINKY] linkyData.EJPHPM   => ")); Serial.println(linkyData.EJPHPM);
-	Serial.print(F("[LINKY] linkyData.BBRHCJB  => ")); Serial.println(linkyData.BBRHCJB);
-	Serial.print(F("[LINKY] linkyData.BBRHPJB  => ")); Serial.println(linkyData.BBRHPJB);
-	Serial.print(F("[LINKY] linkyData.BBRHCJW  => ")); Serial.println(linkyData.BBRHCJW);
-	Serial.print(F("[LINKY] linkyData.BBRHPJW  => ")); Serial.println(linkyData.BBRHPJW);
-	Serial.print(F("[LINKY] linkyData.BBRHCJR  => ")); Serial.println(linkyData.BBRHCJR);
-	Serial.print(F("[LINKY] linkyData.BBRHPJR  => ")); Serial.println(linkyData.BBRHPJR);
-	Serial.print(F("[LINKY] linkyData.PEJP     => ")); Serial.println(linkyData.PEJP);
-	Serial.print(F("[LINKY] linkyData.PTEC     => ")); Serial.println(linkyData.PTEC);
-	Serial.print(F("[LINKY] linkyData.DEMAIN   => ")); Serial.println(linkyData.DEMAIN);
-	Serial.print(F("[LINKY] linkyData.IINST    => ")); Serial.println(linkyData.IINST);
-	Serial.print(F("[LINKY] linkyData.IINST1   => ")); Serial.println(linkyData.IINST1);
-	Serial.print(F("[LINKY] linkyData.IINST2   => ")); Serial.println(linkyData.IINST2);
-	Serial.print(F("[LINKY] linkyData.IINST3   => ")); Serial.println(linkyData.IINST3);
-	Serial.print(F("[LINKY] linkyData.ADPS     => ")); Serial.println(linkyData.ADPS);
-	Serial.print(F("[LINKY] linkyData.ADIR1    => ")); Serial.println(linkyData.ADIR1);
-	Serial.print(F("[LINKY] linkyData.ADIR2    => ")); Serial.println(linkyData.ADIR2);
-	Serial.print(F("[LINKY] linkyData.ADIR3    => ")); Serial.println(linkyData.ADIR3);
-	Serial.print(F("[LINKY] linkyData.IMAX     => ")); Serial.println(linkyData.IMAX);
-	Serial.print(F("[LINKY] linkyData.IMAX1    => ")); Serial.println(linkyData.IMAX1);
-	Serial.print(F("[LINKY] linkyData.IMAX2    => ")); Serial.println(linkyData.IMAX2);
-	Serial.print(F("[LINKY] linkyData.IMAX3    => ")); Serial.println(linkyData.IMAX3);
-	Serial.print(F("[LINKY] linkyData.PMAX     => ")); Serial.println(linkyData.PMAX);
-	Serial.print(F("[LINKY] linkyData.PAPP     => ")); Serial.println(linkyData.PAPP);
-	Serial.print(F("[LINKY] linkyData.HHPHC    => ")); Serial.println(linkyData.HHPHC);
-	Serial.print(F("[LINKY] linkyData.MOTDETA  => ")); Serial.println(linkyData.MOTDETAT);
-	Serial.print(F("[LINKY] linkyData.PPOT     => ")); Serial.println(linkyData.PPOT);
-	Serial.println();
-	Serial.println();
-}*/
+#ifdef DEBUG
+	void dumpStruct(LinkyData linkyData) {
+		Serial.print(F("[LINKY] Data dump incomming"));
+		Serial.print(F("[LINKY] linkyData.ADCO     => ")); Serial.println(linkyData.ADCO);
+		Serial.print(F("[LINKY] linkyData.OPTARIF  => ")); Serial.println(linkyData.OPTARIF);
+		Serial.print(F("[LINKY] linkyData.ISOUSC   => ")); Serial.println(linkyData.ISOUSC);
+		Serial.print(F("[LINKY] linkyData.HCHC     => ")); Serial.println(linkyData.HCHC);
+		Serial.print(F("[LINKY] linkyData.HCHP     => ")); Serial.println(linkyData.HCHP);
+		Serial.print(F("[LINKY] linkyData.EJPHN    => ")); Serial.println(linkyData.EJPHN);
+		Serial.print(F("[LINKY] linkyData.EJPHPM   => ")); Serial.println(linkyData.EJPHPM);
+		Serial.print(F("[LINKY] linkyData.BBRHCJB  => ")); Serial.println(linkyData.BBRHCJB);
+		Serial.print(F("[LINKY] linkyData.BBRHPJB  => ")); Serial.println(linkyData.BBRHPJB);
+		Serial.print(F("[LINKY] linkyData.BBRHCJW  => ")); Serial.println(linkyData.BBRHCJW);
+		Serial.print(F("[LINKY] linkyData.BBRHPJW  => ")); Serial.println(linkyData.BBRHPJW);
+		Serial.print(F("[LINKY] linkyData.BBRHCJR  => ")); Serial.println(linkyData.BBRHCJR);
+		Serial.print(F("[LINKY] linkyData.BBRHPJR  => ")); Serial.println(linkyData.BBRHPJR);
+		Serial.print(F("[LINKY] linkyData.PEJP     => ")); Serial.println(linkyData.PEJP);
+		Serial.print(F("[LINKY] linkyData.PTEC     => ")); Serial.println(linkyData.PTEC);
+		Serial.print(F("[LINKY] linkyData.DEMAIN   => ")); Serial.println(linkyData.DEMAIN);
+		Serial.print(F("[LINKY] linkyData.IINST    => ")); Serial.println(linkyData.IINST);
+		Serial.print(F("[LINKY] linkyData.IINST1   => ")); Serial.println(linkyData.IINST1);
+		Serial.print(F("[LINKY] linkyData.IINST2   => ")); Serial.println(linkyData.IINST2);
+		Serial.print(F("[LINKY] linkyData.IINST3   => ")); Serial.println(linkyData.IINST3);
+		Serial.print(F("[LINKY] linkyData.ADPS     => ")); Serial.println(linkyData.ADPS);
+		Serial.print(F("[LINKY] linkyData.ADIR1    => ")); Serial.println(linkyData.ADIR1);
+		Serial.print(F("[LINKY] linkyData.ADIR2    => ")); Serial.println(linkyData.ADIR2);
+		Serial.print(F("[LINKY] linkyData.ADIR3    => ")); Serial.println(linkyData.ADIR3);
+		Serial.print(F("[LINKY] linkyData.IMAX     => ")); Serial.println(linkyData.IMAX);
+		Serial.print(F("[LINKY] linkyData.IMAX1    => ")); Serial.println(linkyData.IMAX1);
+		Serial.print(F("[LINKY] linkyData.IMAX2    => ")); Serial.println(linkyData.IMAX2);
+		Serial.print(F("[LINKY] linkyData.IMAX3    => ")); Serial.println(linkyData.IMAX3);
+		Serial.print(F("[LINKY] linkyData.PMAX     => ")); Serial.println(linkyData.PMAX);
+		Serial.print(F("[LINKY] linkyData.PAPP     => ")); Serial.println(linkyData.PAPP);
+		Serial.print(F("[LINKY] linkyData.HHPHC    => ")); Serial.println(linkyData.HHPHC);
+		Serial.print(F("[LINKY] linkyData.MOTDETA  => ")); Serial.println(linkyData.MOTDETAT);
+		Serial.print(F("[LINKY] linkyData.PPOT     => ")); Serial.println(linkyData.PPOT);
+		Serial.println();
+		Serial.println();
+	}
+#endif
 
 unsigned long lastLog = 0;
-
 time_t  _filenameToDate(const char *filename) {
     struct tm tm = {0};
     char datePart[5] = {0};
@@ -600,6 +580,4 @@ void loop() {
 			Serial.println("[DB] Done");
 		}
 	}
-
-
 }
