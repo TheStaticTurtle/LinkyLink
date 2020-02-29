@@ -13,9 +13,9 @@
 
 #include "linky.h"
 
-const char* MODULE_SERIAL_NUM   = "LinkyLinky-01-DEV";
+const char* MODULE_SERIAL_NUM   = "LinkyLinky-00001";
 const char* MODULE_VERSION_SOFT = "V1.0";
-const char* MODULE_VERSION_HARD = "V0.0-DEV";
+const char* MODULE_VERSION_HARD = "V1.0";
 
 const int   PINS_LED_STATUS_WIFI = D3;
 const int   PINS_LED_STATUS_LINK = D5;
@@ -25,6 +25,7 @@ const int   LOGGING_INTERVAL     = 10000;
 const int   LOGGING_DAY_KEPT     = 1;
 const char* LOGGING_FOLDER       = "/log/linkydata";
 
+ 
 Linky mLinky(D7,-1,PINS_CTRL_DATA_IN);
 AsyncWebServer server(80);
 DNSServer dns;
