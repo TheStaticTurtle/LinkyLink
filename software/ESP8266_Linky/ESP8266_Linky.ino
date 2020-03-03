@@ -387,7 +387,7 @@ void setup() {
 	AsyncWiFiManager wifiManager(&server,&dns);
 	
 	wifiManager.setAPCallback(configModeCallback);
-	wifiManager.setConfigPortalTimeout(180);
+	wifiManager.setConfigPortalTimeout(60*10);
 
 	WiFi.hostname(MODULE_SERIAL_NUM);
 
