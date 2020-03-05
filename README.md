@@ -21,3 +21,7 @@ Depending on the options you will get the board and a case and ~30cm of cable to
 
 #### Support
 If you need support (eg. firmware update/error) just send me an email at tuglersamuel@gmail.com
+
+- Hardware License: CERN v 1.2
+- Software License: GPL v3
+- Documentation License: CC BY
